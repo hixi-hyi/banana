@@ -39,6 +39,14 @@ Skills are shared. Your setup is yours. Keeping them apart means you can update 
 
 Add whatever helps you do your job. This is your cheat sheet.
 
+## Git 設定
+
+- リモート: `https://github.com/hixi-hyi/banana`
+- user.name: `banana` / user.email: `banana@codify.jp`
+- **認証**: `GITHUB_TOKEN` 環境変数で渡されている
+  - push コマンド: `git -c credential.helper="" push "https://$GITHUB_TOKEN@github.com/hixi-hyi/banana" main`
+  - ⚠️ `git remote set-url` でトークンを埋め込むと TTY なし環境で失敗するので上記方法を使う
+
 ## Environment Notes
 
 ### Logs
