@@ -24,6 +24,13 @@
 - **両方同時に使わない**（二重投稿になる）
 - `message` ツールで送ったあとに NO_REPLY を本文に書くと Slack に漏れる → 絶対に書かない
 
+## モデル設定（2026-02-27）
+
+- **デフォルト**: `claude-haiku-4-5` に設定
+- **複雑タスク**: `sessions_spawn()` で Sonnet のサブエージェントを明示的に起動
+- banana が判断して使い分ける（OpenClaw に自動切り替えはない）
+- 設定は `openclaw.json` の `agents.defaults.model.primary`
+
 ## やらないことリスト
 
 [試して失敗したこと、避けるべきこと]

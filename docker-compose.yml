@@ -8,6 +8,7 @@ services:
       CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
       CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
     volumes:
       - ${HOME}/.openclaw:/home/node/.openclaw
       - ${PWD}:/home/node/.openclaw/workspace
@@ -37,6 +38,7 @@ services:
       CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
       CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
     volumes:
       - ${HOME}/.openclaw:/home/node/.openclaw
       - ${PWD}:/home/node/.openclaw/workspace
