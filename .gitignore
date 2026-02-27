@@ -1,0 +1,19 @@
+# Temporary files
+*.tmp
+*.log
+.DS_Store
+
+# Sensitive information
+secrets/
+credentials/
+*.key
+*.pem
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*~
+
+# Node modules (if any)
+node_modules/
