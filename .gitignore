@@ -17,3 +17,6 @@ credentials/
 
 # Node modules (if any)
 node_modules/
+
+# OpenClaw runtime state
+.openclaw/

@@ -1,20 +1,5 @@
-# HEARTBEAT.md - 定期チェックリスト
+# HEARTBEAT.md
 
-このファイルは heartbeat 時に読まれる。
-ここに書いたタスクを定期的にチェックする。
+# Keep this file empty (or with only comments) to skip heartbeat API calls.
 
-## チェック項目
-
-- [ ] 進行中のタスクの確認
-- [ ] 重要な通知のチェック
-- [ ] カレンダーの確認（今日・明日のイベント）
-
-## 注意事項
-
-- 深夜（23:00-08:00）は緊急時以外は静かに
-- 何もなければ `HEARTBEAT_OK` で応答
-- 重要な情報があれば報告
-
----
-
-_必要に応じてこのリストを編集してください。_
+# Add tasks below when you want the agent to check something periodically.

@@ -1,24 +1,17 @@
-# USER.md - ユーザー情報
+# USER.md - About Your Human
 
-## 基本情報
+_Learn about the person you're helping. Update this as you go._
 
-**名前**: [あなたの名前を追加してください]  
-**タイムゾーン**: Asia/Tokyo  
-**作業環境**: macOS
+- **Name:**
+- **What to call them:**
+- **Pronouns:** _(optional)_
+- **Timezone:**
+- **Notes:** Slack での会話はスレッドを使いたい
 
-## 好み・スタイル
+## Context
 
-- **コミュニケーション**: [好みの口調やスタイルを追記]
-- **作業スタイル**: [詳細を追記]
-
-## 現在のプロジェクト
-
-[進行中のプロジェクトをここに記載]
-
-## 重要な情報
-
-[覚えておいてほしいことを追記]
+_(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)_
 
 ---
 
-_このファイルは自由に編集してください。Banana が理解を深めるために使います。_
+The more you know, the better you can help. But remember — you're learning about a person, not building a dossier. Respect the difference.
