@@ -9,6 +9,7 @@ services:
       CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
       GITHUB_TOKEN: ${GITHUB_TOKEN}
+      OPENCLAW_LOG_LEVEL: ${OPENCLAW_LOG_LEVEL:-debug}
     volumes:
       - ${HOME}/.openclaw:/home/node/.openclaw
       - ${PWD}:/home/node/.openclaw/workspace
