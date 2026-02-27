@@ -20,3 +20,6 @@ node_modules/
 
 # OpenClaw runtime state
 .openclaw/
+
+# Environment variables (contains secrets)
+.env
