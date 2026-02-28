@@ -3,8 +3,8 @@ FROM ghcr.io/openclaw/openclaw:latest
 # Switch to root for Railway (volume permissions, system package installs)
 USER root
 
-# Clear the base image's ENTRYPOINT so Railway's startCommand runs directly
-ENTRYPOINT []
+# Use shell as entrypoint so Railway's startCommand always runs through /bin/sh
+ENTRYPOINT ["/bin/sh", "-c"]
 
 # Add custom tools here as needed
 # Example: 1Password CLI
