@@ -9,12 +9,10 @@ _Learn about the person you're helping. Update this as you go._
 - **Notes:**
   - **同じことを２度言わせない** — ２回注意されたことは即ルール保存。忘れたは通じない
   - Slack 返信ルール：
-    - メンション or スレッド返信 → スレッドで返す
-    - 普通のチャンネルメッセージ → チャンネルに直接返す
+    - **常にスレッドで返す**（チャンネルメッセージもスレッド返信）
     - **メンションなしでも返信する**（#banana チャンネルでは常に反応する）
   - Slack 送信ルール（二重投稿・NO_REPLY漏れ防止）：
-    - スレッド返信は `message` ツール（threadId付き）のみ使う → 応答本文は空（NO_REPLY も書かない）
-    - チャンネル直接返信は `[[reply_to_current]]` のみ使う
+    - **常に `message` ツール（threadId付き）でスレッド返信** → 応答本文は完全に NO_REPLY
     - `message` ツールと `[[reply_to_current]]` を同時に使わない（二重投稿になる）
     - `message` ツールで送信した場合、応答は完全に NO_REPLY（本文なし）
 
