@@ -2,6 +2,5 @@
 dockerfile = "Dockerfile"
 
 [deploy]
-startCommand = "echo STEP1 && echo STEP2 && ls /app && echo STEP3 && node /app/openclaw.mjs gateway run --bind lan --port 8080 --auth token --token $OPENCLAW_GATEWAY_TOKEN --allow-unconfigured"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
