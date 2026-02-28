@@ -99,6 +99,9 @@
     "port": 18789,
     "mode": "local",
     "bind": "loopback",
+    "reload": {
+      "mode": "hot"
+    },
     "controlUi": {
       "allowedOrigins": [
         "http://127.0.0.1:18789"

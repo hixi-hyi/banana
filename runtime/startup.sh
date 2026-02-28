@@ -151,20 +151,8 @@ console.log('[startup] openclaw.json merged and patched');
 PORT="${PORT:-8080}"
 echo "[startup] launching gateway on port ${PORT} (agent: ${AGENT_ID})"
 
-node /app/openclaw.mjs gateway run \
+exec node /app/openclaw.mjs gateway run \
   --bind lan \
   --port "${PORT}" \
   --auth token \
-  --allow-unconfigured &
-GATEWAY_PID=$!
-
-# Railway sends SIGUSR1 during certain internal operations, but openclaw treats
-# SIGUSR1 as a hot-reload trigger (drain tasks + spawn new process without exiting).
-# This confuses Railway's deploy lifecycle → container restart loop.
-# Intercept SIGUSR1 at PID 1 (this shell) so it never reaches the gateway.
-trap '' USR1
-
-# Forward SIGTERM/SIGINT to the gateway for proper graceful shutdown.
-trap 'kill -TERM $GATEWAY_PID' TERM INT
-
-wait $GATEWAY_PID
+  --allow-unconfigured
