@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Railway コンテナに SSH 接続する
+# Usage: ./ssh [コマンド...]
+#   引数なし: インタラクティブシェル
+#   引数あり: そのコマンドを実行して終了
+# Examples:
+#   ./ssh
+#   ./ssh node -e "console.log('hello')"
+#   ./ssh cat /home/node/.openclaw/openclaw.json
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+if [ $# -eq 0 ]; then
+  railway ssh
+else
+  railway ssh -- "$@"
+fi

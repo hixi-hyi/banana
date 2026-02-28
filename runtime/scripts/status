@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# デプロイ状況とサービスの状態を確認する
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+echo "=== Deployment list ==="
+railway deployment list
+
+echo ""
+echo "=== Recent logs (20 lines) ==="
+railway logs --tail 20

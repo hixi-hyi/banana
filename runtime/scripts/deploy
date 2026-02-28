@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Railway に現在のファイルをデプロイする
+# Usage: ./deploy
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+echo "[deploy] pushing to Railway..."
+railway up --detach
+echo "[deploy] done. Build logs above."
+echo "[deploy] watch logs: ./runtime/scripts/logs-follow"

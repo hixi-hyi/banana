@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# ローカルの ~/.openclaw/openclaw.json を sanitize して
+# workspace/openclaw-config-base.json に書き出す
+# Usage: ./config-sync
+#
+# 秘密情報（API キー、トークン等）は __FROM_ENV__ に置換される
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+SRC="${HOME}/.openclaw/openclaw.json"
+DEST="workspace/openclaw-config-base.json"
+
+if [ ! -f "$SRC" ]; then
+  echo "[config-sync] Error: $SRC not found"
+  exit 1
+fi
+
+echo "[config-sync] Sanitizing $SRC → $DEST"
+
+python3 -c "
+import json, sys
+
+d = json.load(sys.stdin)
+
+SENSITIVE_KEYS = {'botToken', 'appToken', 'key', 'token', 'apiKey', 'password', 'secret'}
+
+def sanitize(obj):
+    if isinstance(obj, dict):
+        result = {}
+        for k, v in obj.items():
+            if k in SENSITIVE_KEYS and isinstance(v, str) and len(v) > 10:
+                result[k] = '__FROM_ENV__'
+            else:
+                result[k] = sanitize(v)
+        return result
+    elif isinstance(obj, list):
+        return [sanitize(i) for i in obj]
+    return obj
+
+print(json.dumps(sanitize(d), indent=2, ensure_ascii=False))
+" < "$SRC" > "$DEST"
+
+echo "[config-sync] Done: $DEST"
+echo "[config-sync] Review the diff, then commit and deploy."
+git diff "$DEST" || true

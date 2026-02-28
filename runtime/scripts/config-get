@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Railway コンテナ上の openclaw.json を取得して表示する
+# Usage: ./config-get [jq フィルタ]
+# Examples:
+#   ./config-get
+#   ./config-get '.gateway'
+#   ./config-get '.agents.defaults.model'
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+FILTER="${1:-.}"
+
+railway ssh -- cat /home/node/.openclaw/openclaw.json | jq "$FILTER"

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# ログを確認する（デフォルト: 直近 100 行）
+# Usage: ./logs [行数]
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+LINES="${1:-100}"
+railway logs --tail "$LINES"

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# openclaw.json をリセットして再デプロイする
+# openclaw-config-base.json を元に startup.sh が再構築する
+# Usage: ./config-reset
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+echo "[config-reset] WARNING: This will redeploy and rebuild openclaw.json from scratch."
+echo "[config-reset] Runtime-generated data (sessions, device pairings, etc.) will be preserved via deep merge."
+read -p "Continue? [y/N] " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+  echo "[config-reset] Aborted."
+  exit 0
+fi
+
+echo "[config-reset] Deploying..."
+railway up --detach
+echo "[config-reset] Done. Watch logs: ./runtime/scripts/logs-follow"

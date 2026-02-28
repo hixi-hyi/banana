@@ -20,27 +20,20 @@
 | `OPENCLAW_STATE_DIR` | `/home/node/.openclaw` |
 | `SETUP_PASSWORD` | `/setup` ページのパスワード |
 
-## 接続・操作コマンド
+## よく使うスクリプト（`runtime/scripts/` 以下）
 
-```bash
-# リポジトリのディレクトリで実行すること（cd ~/Workspaces/github.com/hixi-hyi/banana）
+リポジトリルートから実行すること。
 
-# ログ確認（直近 50 行）
-railway logs --tail 50
-
-# SSH でコンテナに入る（インタラクティブ）
-railway ssh
-
-# SSH でコマンドを実行
-railway ssh -- node -e "console.log('hello')"
-railway ssh -- cat /home/node/.openclaw/openclaw.json
-
-# デプロイ（ローカルファイルを Railway にアップロード）
-railway up --detach
-
-# デプロイ状況確認
-railway deployment list
-```
+| スクリプト | 用途 |
+|-----------|------|
+| `./runtime/scripts/logs [行数]` | ログ確認（デフォルト 100 行） |
+| `./runtime/scripts/logs-follow` | ログをリアルタイムで追う（Ctrl+C で終了） |
+| `./runtime/scripts/deploy` | Railway にデプロイ |
+| `./runtime/scripts/status` | デプロイ状況 + 直近ログを表示 |
+| `./runtime/scripts/ssh [コマンド]` | コンテナに SSH（引数なしでシェル起動） |
+| `./runtime/scripts/config-get [jqフィルタ]` | コンテナ上の openclaw.json を確認 |
+| `./runtime/scripts/config-reset` | openclaw.json をリセットして再デプロイ |
+| `./runtime/scripts/config-sync` | ローカル設定を sanitize して openclaw-config-base.json に同期 |
 
 ## リポジトリ構成
 
