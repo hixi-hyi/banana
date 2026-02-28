@@ -39,12 +39,28 @@ Skills are shared. Your setup is yours. Keeping them apart means you can update 
 
 Add whatever helps you do your job. This is your cheat sheet.
 
+## リポジトリ構成（重要）
+
+```
+/home/node/.openclaw/repo/        ← git リポジトリルート（.git はここ）
+├── workspace/                    ← エージェントのワークスペース（ここが "home"）
+│   ├── AGENTS.md, SOUL.md ...
+│   └── memory/, skills/
+└── runtime/                      ← デプロイ設定（Dockerfile 等）
+```
+
+**git 操作は必ずリポジトリルート `/home/node/.openclaw/repo/` で行う。**
+
+ワークスペース（`workspace/`）は git リポジトリのサブディレクトリ。
+`workspace/` 内でファイルを書いて `git -C /home/node/.openclaw/repo add -A` すると、
+`workspace/AGENTS.md` のようなパスで正しく commit される。
+
 ## Git 設定
 
 - リモート: `https://github.com/hixi-hyi/banana`
-- user.name: `banana` / user.email: `banana@codify.jp`
+- user.name: `Banana (Railway)` / user.email: `banana-railway@openclaw`
 - **認証**: `GITHUB_TOKEN` 環境変数で渡されている
-  - push コマンド: `git -c credential.helper="" push "https://$GITHUB_TOKEN@github.com/hixi-hyi/banana" main`
+  - push コマンド: `git -C /home/node/.openclaw/repo push`（credentials は `/root/.git-credentials` に設定済み）
   - ⚠️ `git remote set-url` でトークンを埋め込むと TTY なし環境で失敗するので上記方法を使う
 
 ## Environment Notes

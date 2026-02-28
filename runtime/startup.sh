@@ -13,6 +13,14 @@ echo "[startup] repo:      ${REPO_DIR}"
 echo "[startup] workspace: ${WORKSPACE_DIR}"
 mkdir -p "${STATE_DIR}" "${REPO_DIR}" "${WORKSPACE_DIR}" "${AGENT_DIR}"
 
+# Remove legacy workspace directory (pre-refactor: was the repo root clone)
+# Kept this data in REPO_DIR instead; old path confuses git operations
+OLD_WORKSPACE="${STATE_DIR}/workspace"
+if [ -d "${OLD_WORKSPACE}/.git" ]; then
+  echo "[startup] removing legacy workspace at ${OLD_WORKSPACE}"
+  rm -rf "${OLD_WORKSPACE}"
+fi
+
 # ── 1. Clone or pull the banana repo ─────────────────────────────────────────
 # Full repo lives at REPO_DIR; agent workspace is repo/workspace/ subdirectory
 if [ -n "${GITHUB_TOKEN}" ]; then
