@@ -31,6 +31,8 @@ if [ -n "${GITHUB_TOKEN}" ]; then
     git -C "${REPO_DIR}" pull --ff-only origin main 2>&1 || echo "[startup] git pull skipped (local changes?)"
   else
     echo "[startup] repo: cloning"
+    # Remove directory if it exists but has no .git (e.g. partial previous clone)
+    rm -rf "${REPO_DIR}"
     git clone "${REPO_URL}" "${REPO_DIR}" 2>&1
   fi
   # git config for auto-push (used by heartbeat)
