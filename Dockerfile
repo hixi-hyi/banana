@@ -9,5 +9,10 @@ USER root
 #     && dpkg -i /tmp/op.deb \
 #     && rm /tmp/op.deb
 
+COPY docker-entrypoint-railway.sh /usr/local/bin/docker-entrypoint-railway.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint-railway.sh
+
 # Switch back to node user
 USER node
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint-railway.sh"]
