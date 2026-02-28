@@ -1,16 +1,13 @@
 FROM ghcr.io/openclaw/openclaw:latest
 
-# Switch to root to install system packages and run as root in Railway
-# (Railway volume permissions require root or explicit chown)
+# Switch to root for Railway (volume permissions, system package installs)
 USER root
+
+# Clear the base image's ENTRYPOINT so Railway's startCommand runs directly
+ENTRYPOINT []
 
 # Add custom tools here as needed
 # Example: 1Password CLI
 # RUN curl -sS https://downloads.1password.com/linux/debian/amd64/stable/1password-cli-amd64-latest.deb -o /tmp/op.deb \
 #     && dpkg -i /tmp/op.deb \
 #     && rm /tmp/op.deb
-
-COPY docker-entrypoint-railway.sh /usr/local/bin/docker-entrypoint-railway.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint-railway.sh
-
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint-railway.sh"]
