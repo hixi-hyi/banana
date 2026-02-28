@@ -108,6 +108,12 @@ if (process.env.SLACK_BOT_TOKEN || process.env.SLACK_APP_TOKEN) {
   console.log('[startup] slack tokens injected from env');
 }
 
+// Remove fields that are invalid in this version of openclaw
+// (may have been written by agent with wrong values)
+if (c.channels && c.channels.slack) {
+  delete c.channels.slack.dmPolicy;
+}
+
 // Ensure agent list is set correctly
 c.agents = c.agents || {};
 c.agents.defaults = c.agents.defaults || {};
