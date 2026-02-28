@@ -11,6 +11,7 @@ _Learn about the person you're helping. Update this as you go._
   - Slack 返信ルール：
     - メンション or スレッド返信 → スレッドで返す
     - 普通のチャンネルメッセージ → チャンネルに直接返す
+    - **メンションなしでも返信する**（#banana チャンネルでは常に反応する）
   - Slack 送信ルール（二重投稿・NO_REPLY漏れ防止）：
     - スレッド返信は `message` ツール（threadId付き）のみ使う → 応答本文は空（NO_REPLY も書かない）
     - チャンネル直接返信は `[[reply_to_current]]` のみ使う
