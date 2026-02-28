@@ -3,7 +3,7 @@ FROM ghcr.io/openclaw/openclaw:latest
 # Switch to root for Railway (volume permissions, system package installs)
 USER root
 
-COPY runtime/startup.sh /startup.sh
+COPY startup.sh /startup.sh
 RUN chmod +x /startup.sh
 
 # startup.sh handles config patching and gateway launch
