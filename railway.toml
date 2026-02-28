@@ -1,0 +1,9 @@
+[build]
+dockerfile = "Dockerfile"
+
+[deploy]
+startCommand = "node openclaw.mjs gateway --bind lan --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
