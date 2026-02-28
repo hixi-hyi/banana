@@ -2,6 +2,6 @@
 dockerfile = "Dockerfile"
 
 [deploy]
-startCommand = "echo 'DEBUG_START' && node /app/openclaw.mjs --version && echo 'DEBUG_VERSION_OK' && node /app/openclaw.mjs gateway run --bind lan --port 8080 --auth token --token $OPENCLAW_GATEWAY_TOKEN --allow-unconfigured"
+startCommand = "echo 'DEBUG_START' && ls /app 2>&1 && echo 'DEBUG_LS_OK' && node /app/openclaw.mjs --version 2>&1 || echo 'VERSION_FAILED' && node /app/openclaw.mjs gateway run --bind lan --port 8080 --auth token --token $OPENCLAW_GATEWAY_TOKEN --allow-unconfigured 2>&1"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
