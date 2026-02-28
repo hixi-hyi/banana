@@ -22,7 +22,7 @@ if [ -n "${GITHUB_TOKEN}" ]; then
     echo "[startup] workspace: cloning repo"
     git clone "${REPO_URL}" "${WORKSPACE_DIR}" 2>&1
   fi
-  # git config for auto-push
+  # git config for auto-push (used by heartbeat)
   git config --global user.email "banana-railway@openclaw"
   git config --global user.name "Banana (Railway)"
   git config --global credential.helper store
@@ -48,21 +48,71 @@ console.log('[startup] agent auth-profiles.json written');
 "
 fi
 
-# ── 3. Main openclaw.json config patch ───────────────────────────────────────
+# ── 3. Merge base config from repo, then overlay secrets ─────────────────────
+# Base config lives at WORKSPACE_DIR/openclaw-config-base.json (committed to git)
+# It has __FROM_ENV__ placeholders for secrets. We merge it with existing state,
+# then inject real values from env vars.
 node -e "
 const fs = require('fs');
-const p = '${CONFIG}';
-let c = {};
-try { c = JSON.parse(fs.readFileSync(p, 'utf8')); } catch(e) {}
+const configPath = '${CONFIG}';
+const basePath = '${WORKSPACE_DIR}/openclaw-config-base.json';
 
-// Agent list (banana agent)
+// Deep merge: target is base, overlay is existing state (preserves runtime-only data)
+function deepMerge(base, overlay) {
+  if (typeof base !== 'object' || base === null) return overlay ?? base;
+  if (typeof overlay !== 'object' || overlay === null) return base;
+  const result = { ...base };
+  for (const k of Object.keys(overlay)) {
+    if (k in base && typeof base[k] === 'object' && !Array.isArray(base[k])) {
+      result[k] = deepMerge(base[k], overlay[k]);
+    } else {
+      result[k] = overlay[k];
+    }
+  }
+  return result;
+}
+
+// Load base config from repo (source of truth for structure/settings)
+let base = {};
+try { base = JSON.parse(fs.readFileSync(basePath, 'utf8')); console.log('[startup] loaded base config from repo'); }
+catch(e) { console.log('[startup] no base config in repo, starting fresh'); }
+
+// Load existing runtime state (devices, sessions refs, etc.)
+let existing = {};
+try { existing = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch(e) {}
+
+// Merge: base wins for structure, existing wins for runtime-generated data
+let c = deepMerge(base, existing);
+
+// Force Railway-specific gateway settings (override local/base values)
+c.gateway = c.gateway || {};
+c.gateway.controlUi = c.gateway.controlUi || {};
+c.gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback = true;
+c.gateway.controlUi.allowInsecureAuth = true;
+delete c.gateway.controlUi.allowedOrigins; // local-only setting
+c.gateway.auth = c.gateway.auth || {};
+c.gateway.auth.token = process.env.OPENCLAW_GATEWAY_TOKEN || c.gateway.auth.token || '';
+c.gateway.auth.mode = 'token';
+c.gateway.bind = 'lan';
+c.gateway.trustedProxies = ['127.0.0.1', '100.64.0.0/10'];
+
+// Inject Slack secrets from env vars
+if (process.env.SLACK_BOT_TOKEN || process.env.SLACK_APP_TOKEN) {
+  c.channels = c.channels || {};
+  c.channels.slack = c.channels.slack || {};
+  c.channels.slack.enabled = true;
+  if (process.env.SLACK_BOT_TOKEN)
+    c.channels.slack.botToken = process.env.SLACK_BOT_TOKEN;
+  if (process.env.SLACK_APP_TOKEN)
+    c.channels.slack.appToken = process.env.SLACK_APP_TOKEN;
+  console.log('[startup] slack tokens injected from env');
+}
+
+// Ensure agent list is set correctly
 c.agents = c.agents || {};
 c.agents.defaults = c.agents.defaults || {};
-c.agents.defaults.model = c.agents.defaults.model || {};
-if (!c.agents.defaults.model.primary)
-  c.agents.defaults.model.primary = 'anthropic/claude-sonnet-4-6';
 c.agents.defaults.workspace = '${WORKSPACE_DIR}';
-
+c.agents.list = c.agents.list || [];
 const agentEntry = {
   id: '${AGENT_ID}',
   name: 'Banana',
@@ -70,41 +120,12 @@ const agentEntry = {
   agentDir: '${AGENT_DIR}',
   identity: { name: 'Banana', emoji: '\uD83C\uDF4C' }
 };
-c.agents.list = c.agents.list || [];
-const existing = c.agents.list.findIndex(a => a.id === '${AGENT_ID}');
-if (existing >= 0) c.agents.list[existing] = agentEntry;
+const idx = c.agents.list.findIndex(a => a.id === '${AGENT_ID}');
+if (idx >= 0) c.agents.list[idx] = agentEntry;
 else c.agents.list.push(agentEntry);
 
-// Auth profile reference
-c.auth = c.auth || {};
-c.auth.profiles = c.auth.profiles || {};
-c.auth.profiles['anthropic:default'] = { provider: 'anthropic', mode: 'api_key' };
-
-// Gateway settings
-c.gateway = c.gateway || {};
-c.gateway.controlUi = c.gateway.controlUi || {};
-c.gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback = true;
-c.gateway.controlUi.allowInsecureAuth = true;
-c.gateway.auth = c.gateway.auth || {};
-if (!c.gateway.auth.token) c.gateway.auth.token = process.env.OPENCLAW_GATEWAY_TOKEN || '';
-// Trust Railway's internal proxy IPs (100.64.x.x CGNAT range)
-c.gateway.trustedProxies = ['127.0.0.1', '100.64.0.0/10'];
-
-// Slack channel - inject tokens from env vars if not already set
-if (process.env.SLACK_BOT_TOKEN || process.env.SLACK_APP_TOKEN) {
-  c.channels = c.channels || {};
-  c.channels.slack = c.channels.slack || {};
-  c.channels.slack.enabled = true;
-  c.channels.slack.mode = c.channels.slack.mode || 'socket';
-  if (process.env.SLACK_BOT_TOKEN && !c.channels.slack.botToken)
-    c.channels.slack.botToken = process.env.SLACK_BOT_TOKEN;
-  if (process.env.SLACK_APP_TOKEN && !c.channels.slack.appToken)
-    c.channels.slack.appToken = process.env.SLACK_APP_TOKEN;
-  console.log('[startup] slack channel configured');
-}
-
-fs.writeFileSync(p, JSON.stringify(c, null, 2));
-console.log('[startup] openclaw.json patched');
+fs.writeFileSync(configPath, JSON.stringify(c, null, 2));
+console.log('[startup] openclaw.json merged and patched');
 "
 
 # ── 4. Launch gateway ─────────────────────────────────────────────────────────
