@@ -1,6 +1,8 @@
 services:
   openclaw-gateway:
-    build: ${OPENCLAW_BUILD_CONTEXT:-.}
+    build:
+      context: ..
+      dockerfile: runtime/Dockerfile
     image: ${OPENCLAW_IMAGE:-openclaw:local}
     environment:
       HOME: /home/node
@@ -13,7 +15,7 @@ services:
       OPENCLAW_LOG_LEVEL: ${OPENCLAW_LOG_LEVEL:-debug}
     volumes:
       - ${HOME}/.openclaw:/home/node/.openclaw
-      - ${PWD}:/home/node/.openclaw/workspace
+      - ../workspace:/home/node/.openclaw/workspace
     ports:
       - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
       - "${OPENCLAW_BRIDGE_PORT:-18790}:18790"
@@ -31,7 +33,9 @@ services:
       ]
 
   openclaw-cli:
-    build: ${OPENCLAW_BUILD_CONTEXT:-.}
+    build:
+      context: ..
+      dockerfile: runtime/Dockerfile
     image: ${OPENCLAW_IMAGE:-openclaw:local}
     environment:
       HOME: /home/node
@@ -44,7 +48,7 @@ services:
       GITHUB_TOKEN: ${GITHUB_TOKEN}
     volumes:
       - ${HOME}/.openclaw:/home/node/.openclaw
-      - ${PWD}:/home/node/.openclaw/workspace
+      - ../workspace:/home/node/.openclaw/workspace
     stdin_open: true
     tty: true
     init: true

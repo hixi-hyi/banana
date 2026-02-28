@@ -42,36 +42,55 @@ railway up --detach
 railway deployment list
 ```
 
+## リポジトリ構成
+
+```
+banana/
+├── railway.toml          # Railway CLI 用（root 必須）
+├── workspace/            # エージェントの人格・記憶（openclaw ワークスペース）
+│   ├── AGENTS.md
+│   ├── SOUL.md / IDENTITY.md / MEMORY.md / USER.md
+│   ├── HEARTBEAT.md / TOOLS.md / BOOTSTRAP.md
+│   ├── openclaw-config-base.json
+│   ├── memory/
+│   └── skills/
+└── runtime/              # 実行環境（このファイルもここ）
+    ├── Dockerfile
+    ├── startup.sh
+    ├── docker-compose.yml
+    └── RAILWAY.md
+```
+
 ## 同期されているファイル（git → Railway）
 
-起動時に `startup.sh` が `git pull` で取得し Railway に反映されるもの：
+起動時に `runtime/startup.sh` がリポジトリ全体を `/home/node/.openclaw/repo/` に clone/pull し、Railway に反映される：
 
-| ファイル | 内容 |
-|----------|------|
-| `AGENTS.md` | ワークスペースルール |
-| `SOUL.md` | エージェントの核心 |
-| `IDENTITY.md` | エージェントのアイデンティティ |
-| `MEMORY.md` | 長期記憶 |
-| `USER.md` | ユーザー情報 |
-| `HEARTBEAT.md` | ハートビート設定 |
-| `TOOLS.md` | エージェントのツール設定 |
-| `RAILWAY.md` | このファイル |
-| `memory/YYYY-MM-DD.md` | 日次ログ |
-| `openclaw-config-base.json` | openclaw 設定のベース（秘密情報なし） |
-| `startup.sh` | 起動スクリプト |
+| パス | 内容 |
+|------|------|
+| `workspace/AGENTS.md` | ワークスペースルール |
+| `workspace/SOUL.md` | エージェントの核心 |
+| `workspace/IDENTITY.md` | アイデンティティ |
+| `workspace/MEMORY.md` | 長期記憶 |
+| `workspace/USER.md` | ユーザー情報 |
+| `workspace/HEARTBEAT.md` | ハートビート設定 |
+| `workspace/TOOLS.md` | ツール設定 |
+| `workspace/openclaw-config-base.json` | openclaw 設定ベース（秘密情報なし） |
+| `workspace/memory/` | 日次ログ |
+| `runtime/startup.sh` | 起動スクリプト |
 
 **秘密情報（git には入れない）:** API キー、Slack トークン、Gateway トークン → Railway の環境変数で管理
 
 ## startup.sh の処理フロー（毎回起動時）
 
-1. `git pull` でリポジトリの最新を取得（AGENTS.md, SOUL.md 等も更新される）
-2. git 認証情報を設定（GITHUB_TOKEN → `/root/.git-credentials`）
-3. `ANTHROPIC_API_KEY` を `agents/banana/agent/auth-profiles.json` に書き込む
-4. `openclaw-config-base.json`（リポジトリ）と既存の `openclaw.json`（ボリューム）を deep merge
-5. Railway 固有の設定を上書き（bind=lan, trustedProxies, allowInsecureAuth 等）
-6. Slack トークンを env var から注入
-7. 無効なフィールド（dmPolicy 等）を削除
-8. `openclaw gateway run` で起動
+1. リポジトリ全体を `/home/node/.openclaw/repo/` に clone/pull
+2. エージェントワークスペース = `repo/workspace/`（ここに AGENTS.md 等が入る）
+3. git 認証情報を設定（GITHUB_TOKEN → `/root/.git-credentials`）
+4. `ANTHROPIC_API_KEY` を `agents/banana/agent/auth-profiles.json` に書き込む
+5. `repo/workspace/openclaw-config-base.json` を読んで既存の `openclaw.json` と deep merge
+6. Railway 固有の設定を上書き（bind=lan, trustedProxies, allowInsecureAuth 等）
+7. Slack トークンを env var から注入
+8. 無効なフィールド（dmPolicy 等）を削除
+9. `openclaw gateway run` で起動
 
 ## 何か問題が起きたときの対処
 
@@ -105,7 +124,7 @@ console.log('done');
 
 ### 設定をリセットしたい
 
-再デプロイすれば `startup.sh` が `openclaw-config-base.json`（git 上のベース設定）を読み直して再構築する：
+再デプロイすれば `runtime/startup.sh` が `workspace/openclaw-config-base.json`（git 上のベース設定）を読み直して再構築する：
 
 ```bash
 railway up --detach
@@ -113,12 +132,12 @@ railway up --detach
 
 ### ローカルの設定変更を Railway に反映したい
 
-1. `~/.openclaw/openclaw.json` の秘密情報を除いた版を `openclaw-config-base.json` に更新
+1. `~/.openclaw/openclaw.json` の秘密情報を除いた版を `workspace/openclaw-config-base.json` に更新
 2. git commit & push
 3. Railway を再デプロイ（または次回再起動時に自動反映）
 
 ```bash
-# ローカル設定を sanitize してリポジトリに保存するコマンド
+# ローカル設定を sanitize してリポジトリに保存するコマンド（リポジトリルートで実行）
 cat ~/.openclaw/openclaw.json | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
@@ -135,5 +154,12 @@ def sanitize(obj):
         return [sanitize(i) for i in obj]
     return obj
 print(json.dumps(sanitize(d), indent=2))
-" > openclaw-config-base.json
+" > workspace/openclaw-config-base.json
+```
+
+### ローカルで docker-compose を使う
+
+```bash
+# リポジトリルートから実行
+docker compose -f runtime/docker-compose.yml up
 ```

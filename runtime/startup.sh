@@ -2,25 +2,28 @@
 set -e
 
 STATE_DIR="${OPENCLAW_STATE_DIR:-/home/node/.openclaw}"
-WORKSPACE_DIR="${OPENCLAW_WORKSPACE_DIR:-${STATE_DIR}/workspace}"
+REPO_DIR="${STATE_DIR}/repo"
+WORKSPACE_DIR="${REPO_DIR}/workspace"
 CONFIG="${STATE_DIR}/openclaw.json"
 AGENT_ID="${OPENCLAW_AGENT_ID:-banana}"
 AGENT_DIR="${STATE_DIR}/agents/${AGENT_ID}/agent"
 
 echo "[startup] state dir: ${STATE_DIR}"
+echo "[startup] repo:      ${REPO_DIR}"
 echo "[startup] workspace: ${WORKSPACE_DIR}"
-mkdir -p "${STATE_DIR}" "${WORKSPACE_DIR}" "${AGENT_DIR}"
+mkdir -p "${STATE_DIR}" "${REPO_DIR}" "${WORKSPACE_DIR}" "${AGENT_DIR}"
 
-# ── 1. Workspace: clone or pull the banana repo ──────────────────────────────
+# ── 1. Clone or pull the banana repo ─────────────────────────────────────────
+# Full repo lives at REPO_DIR; agent workspace is repo/workspace/ subdirectory
 if [ -n "${GITHUB_TOKEN}" ]; then
   REPO_URL="https://${GITHUB_TOKEN}@github.com/hixi-hyi/banana"
-  if [ -d "${WORKSPACE_DIR}/.git" ]; then
-    echo "[startup] workspace: pulling latest"
-    git -C "${WORKSPACE_DIR}" remote set-url origin "${REPO_URL}" 2>/dev/null || true
-    git -C "${WORKSPACE_DIR}" pull --ff-only origin main 2>&1 || echo "[startup] git pull skipped (local changes?)"
+  if [ -d "${REPO_DIR}/.git" ]; then
+    echo "[startup] repo: pulling latest"
+    git -C "${REPO_DIR}" remote set-url origin "${REPO_URL}" 2>/dev/null || true
+    git -C "${REPO_DIR}" pull --ff-only origin main 2>&1 || echo "[startup] git pull skipped (local changes?)"
   else
-    echo "[startup] workspace: cloning repo"
-    git clone "${REPO_URL}" "${WORKSPACE_DIR}" 2>&1
+    echo "[startup] repo: cloning"
+    git clone "${REPO_URL}" "${REPO_DIR}" 2>&1
   fi
   # git config for auto-push (used by heartbeat)
   git config --global user.email "banana-railway@openclaw"
