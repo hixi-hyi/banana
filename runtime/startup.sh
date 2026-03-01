@@ -119,6 +119,14 @@ if (process.env.SLACK_BOT_TOKEN || process.env.SLACK_APP_TOKEN) {
   console.log('[startup] slack tokens injected from env');
 }
 
+// Inject Discord token from env vars
+if (process.env.DISCORD_BOT_TOKEN) {
+  c.channels = c.channels || {};
+  c.channels.discord = c.channels.discord || {};
+  c.channels.discord.token = process.env.DISCORD_BOT_TOKEN;
+  console.log('[startup] discord token injected from env');
+}
+
 // Remove fields that are invalid in this version of openclaw
 // (may have been written by agent with wrong values)
 if (c.channels && c.channels.slack) {
