@@ -36,6 +36,8 @@ if [ -n "${GITHUB_TOKEN}" ]; then
   git config --global user.email "banana-railway@openclaw"
   git config --global user.name "Banana (Railway)"
   git config --global credential.helper store
+  # enable .githooks/ (pre-commit auto-syncs openclaw-config-base.json)
+  git -C "${WORKSPACE_DIR}" config core.hooksPath .githooks
   echo "https://${GITHUB_TOKEN}@github.com" > /root/.git-credentials
   chmod 600 /root/.git-credentials
   echo "[startup] git credentials configured"

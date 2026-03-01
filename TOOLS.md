@@ -41,26 +41,33 @@ Add whatever helps you do your job. This is your cheat sheet.
 
 ## openclaw 設定の変更と同期（重要）
 
-openclaw の設定（チャンネル設定、モデル設定など）を変更した場合は、必ず git に同期すること。
+openclaw の設定（チャンネル設定、モデル設定など）を変更すると `openclaw.json`（volume）が更新される。
+**git commit のたびに pre-commit フックが自動で `openclaw-config-base.json` に同期するため、通常は何もしなくてよい。**
 
-### 設定変更のワークフロー
+### 自動同期の仕組み
 
-1. openclaw のコマンドや設定変更を行う（openclaw.json が更新される）
-2. 以下のコマンドで git に同期する：
+```
+openclaw が設定変更 → openclaw.json 更新
+     ↓
+banana が何らかの git commit をする
+     ↓
+pre-commit フック（.githooks/pre-commit）が自動実行
+     ↓
+openclaw.json を sanitize（token → __FROM_ENV__）して
+openclaw-config-base.json に書き出し → git add（今回の commit に含まれる）
+```
+
+### 手動で強制 sync したい場合
 
 ```bash
 node /home/node/.openclaw/workspace/runtime/scripts/config-sync-container
 ```
 
-このスクリプトが行うこと：
-- `/home/node/.openclaw/openclaw.json` を読み込む
-- token 等の秘密情報を `__FROM_ENV__` に置換（git に秘密情報を入れない）
-- Railway 固有の設定（gateway.bind 等）を base 値に戻す
-- `openclaw-config-base.json` に書き出して commit & push
+（sanitize → write → commit → push まで一括実行）
 
 ### なぜ必要か
 
-- `openclaw.json` は Railway volume にあり、コンテナが再構築されると内容が `openclaw-config-base.json`（git）で上書きされる
+- `openclaw.json` は Railway volume にあり、コンテナ再構築時に `openclaw-config-base.json`（git）で上書きされる
 - 同期しないと設定変更が次回デプロイ時に失われる
 
 ---

@@ -1,0 +1,57 @@
+#!/usr/bin/env node
+// pre-commit hook: openclaw.json を自動 sanitize して staging に追加する
+// - このフックは commit のたびに実行される
+// - config-sync-container と違い、git commit/push はしない（現在の commit に含める）
+'use strict';
+
+const fs = require('fs');
+const { execSync } = require('child_process');
+
+const STATE_DIR = process.env.OPENCLAW_STATE_DIR || '/home/node/.openclaw';
+const WORKSPACE_DIR = `${STATE_DIR}/workspace`;
+const SRC = `${STATE_DIR}/openclaw.json`;
+const DEST = `${WORKSPACE_DIR}/openclaw-config-base.json`;
+
+// openclaw.json がなければスキップ（ローカル開発環境等）
+if (!fs.existsSync(SRC)) process.exit(0);
+
+const SENSITIVE_KEYS = new Set(['botToken', 'appToken', 'token', 'key', 'apiKey', 'password', 'secret']);
+
+function sanitize(obj) {
+  if (Array.isArray(obj)) return obj.map(sanitize);
+  if (obj !== null && typeof obj === 'object') {
+    const result = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (SENSITIVE_KEYS.has(k) && typeof v === 'string' && v.length > 10) {
+        result[k] = '__FROM_ENV__';
+      } else {
+        result[k] = sanitize(v);
+      }
+    }
+    return result;
+  }
+  return obj;
+}
+
+function restoreBaseGateway(config) {
+  if (!config.gateway) return config;
+  const gw = { ...config.gateway };
+  delete gw.trustedProxies;
+  gw.bind = 'loopback';
+  gw.controlUi = { allowedOrigins: ['http://127.0.0.1:18789'] };
+  gw.auth = { mode: 'none', token: '__FROM_ENV__' };
+  return { ...config, gateway: gw };
+}
+
+try {
+  const raw = JSON.parse(fs.readFileSync(SRC, 'utf8'));
+  const sanitized = sanitize(restoreBaseGateway(raw));
+  fs.writeFileSync(DEST, JSON.stringify(sanitized, null, 2) + '\n');
+
+  // staging に追加（このフックで更新した分も今回の commit に含める）
+  execSync(`git -C "${WORKSPACE_DIR}" add openclaw-config-base.json`);
+  console.log('[pre-commit] openclaw-config-base.json synced');
+} catch (e) {
+  // sync 失敗しても commit は止めない
+  console.error('[pre-commit] config sync failed (non-fatal):', e.message);
+}
