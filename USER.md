@@ -15,6 +15,10 @@ _Learn about the person you're helping. Update this as you go._
     - **常に `message` ツール（threadId付き）でスレッド返信** → 応答本文は完全に NO_REPLY
     - `message` ツールと `[[reply_to_current]]` を同時に使わない（二重投稿になる）
     - `message` ツールで送信した場合、応答は完全に NO_REPLY（本文なし）
+  - エラーメッセージが出たら：
+    - **自分で確認する**（read/exec で実際の状態検証）
+    - 同じ操作を繰り返さない（最大2回まで）
+    - 検証結果を報告する（failed で終わらない）
   - Slack 通知ルール：
     - 定期通知系（朝レポート、タスク管理など）→ `C0AHUGG1C82` チャンネルに送る
     - **Morning Report**: 毎日10:00 UTC に自動実行 (OpenClaw cron scheduler via `cron-jobs.json`)
