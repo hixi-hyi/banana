@@ -93,6 +93,24 @@
           "requireMention": false
         }
       }
+    },
+    "discord": {
+      "enabled": true,
+      "botToken": "__FROM_ENV__",
+      "intents": [
+        "GUILDS",
+        "GUILD_MESSAGES",
+        "MESSAGE_CONTENT",
+        "DIRECT_MESSAGES"
+      ],
+      "allowlist": {
+        "guildIds": [
+          "1032098948552339527"
+        ],
+        "userIds": [
+          "492567172653121557"
+        ]
+      }
     }
   },
   "gateway": {
