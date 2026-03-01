@@ -1,0 +1,27 @@
+{
+  "jobs": [
+    {
+      "jobId": "morning-report-slack",
+      "name": "Morning Report",
+      "description": "Daily morning pending tasks report at 10:00 UTC",
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 10 * * *",
+        "tz": "UTC"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "next-heartbeat",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Run the morning report and send it to the #通知 channel: python3 /home/node/.openclaw/workspace/scripts/slack-morning-report.py"
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "slack",
+        "to": "channel:C0AHUGG1C82",
+        "bestEffort": true
+      },
+      "enabled": true
+    }
+  ]
+}
