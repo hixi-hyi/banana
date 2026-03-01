@@ -68,7 +68,14 @@ edit失敗 → 自分で read して検証 → 「成功してた。確認しま
 - **Server ID**: `1032098948552339527`
 - **User ID**: `492567172653121557`
 - **設定場所**: `openclaw-config-base.json` の `channels.discord`
-- **状態**: ✅ ホットリロード完了（2026-03-01 16:03 UTC）
+- **状態**: ✅ 完全稼働（2026-03-01 19:00 UTC）
+
+**セットアップ完了ステップ：**
+1. Discord Developer Portal で Bot 作成 → Token 取得 ✅
+2. OAuth2 → URL Generator で Scopes（bot, applications.commands）と Permissions（8つ）をチェック ✅
+3. 生成された authorization URL を開いてサーバーに Banana を追加 ✅
+4. Discord チャンネルのアクセス権限を Banana に付与（Edit Channel → Permissions） ✅
+5. テスト完了 → hixi がメッセージを受け取り確認 ✅
 
 ## やらないことリスト
 
