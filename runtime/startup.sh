@@ -124,6 +124,11 @@ if (process.env.SLACK_BOT_TOKEN || process.env.SLACK_APP_TOKEN) {
 if (c.channels && c.channels.slack) {
   delete c.channels.slack.dmPolicy;
 }
+if (c.channels && c.channels.discord) {
+  delete c.channels.discord.botToken;
+  delete c.channels.discord.intents;
+  delete c.channels.discord.allowlist;
+}
 
 // Ensure agent list is set correctly
 c.agents = c.agents || {};
