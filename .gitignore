@@ -23,3 +23,4 @@ node_modules/
 
 # Environment variables (contains secrets)
 .env
+memory/slack-tokens.json

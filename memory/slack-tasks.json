@@ -1,0 +1,16 @@
+{
+  "tasks": [
+    {
+      "id": "cloudbrains:C01JVFE87LZ:1772077443.570189",
+      "workspace": "cloudbrains",
+      "type": "mention",
+      "from": "takegamm",
+      "text": "<@U017Y2ADY4X|hixi>\n\nお手漉きでレビュー&amp;適用お願いします。bastionに環境変数を入れる対応です。\n<https://github.com/cloudbrains/lansmart-infra/pull/16>",
+      "ts": "1772077443.570189",
+      "permalink": "https://cloudbrains.slack.com/archives/C01JVFE87LZ/p1772077443570189?thread_ts=1772077443.570189",
+      "status": "pending",
+      "added_at": "2026-03-01T21:39:51.405439+09:00"
+    }
+  ],
+  "last_updated": "2026-03-01T21:39:51.406338+09:00"
+}
