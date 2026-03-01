@@ -207,6 +207,27 @@ Think of it like a human reviewing their journal and updating their mental model
 
 The goal: Be helpful without being annoying. Check in a few times a day, do useful background work, but respect quiet time.
 
+## 🤖 モデル選択ルール
+
+デフォルトは `claude-haiku-4-5`（軽量・高速）。以下の基準で使い分ける：
+
+**Haiku（メインセッション）で処理する：**
+- 雑談、反応、簡単な質問への回答
+- ファイル読み書き、設定確認などの単純タスク
+- 短いコード修正（数行レベル）
+
+**Sonnet または Opus のサブエージェントを `sessions_spawn()` で起動する：**
+- コードの設計・リファクタリング・デバッグ（複数ファイルにまたがる）
+- 調査・分析・要約が必要なタスク
+- 複数ステップにわたる複雑な作業
+- 「これは重い」と感じたら迷わず spawn する
+
+**モデル指定：**
+- 通常の複雑タスク → `anthropic/claude-sonnet-4-6`
+- 特に難しい問題・長い推論が必要 → `anthropic/claude-opus-4-5`（Opus も使って OK）
+
+判断に迷ったら Sonnet を spawn。Haiku で頑張りすぎない。
+
 ## Make It Yours
 
 This is a starting point. Add your own conventions, style, and rules as you figure out what works.

@@ -2,38 +2,35 @@
 set -e
 
 STATE_DIR="${OPENCLAW_STATE_DIR:-/home/node/.openclaw}"
-REPO_DIR="${STATE_DIR}/repo"
-WORKSPACE_DIR="${REPO_DIR}/workspace"
+WORKSPACE_DIR="${STATE_DIR}/workspace"
 CONFIG="${STATE_DIR}/openclaw.json"
 AGENT_ID="${OPENCLAW_AGENT_ID:-banana}"
 AGENT_DIR="${STATE_DIR}/agents/${AGENT_ID}/agent"
 
 echo "[startup] state dir: ${STATE_DIR}"
-echo "[startup] repo:      ${REPO_DIR}"
 echo "[startup] workspace: ${WORKSPACE_DIR}"
-mkdir -p "${STATE_DIR}" "${REPO_DIR}" "${WORKSPACE_DIR}" "${AGENT_DIR}"
+mkdir -p "${STATE_DIR}" "${WORKSPACE_DIR}" "${AGENT_DIR}"
 
-# Remove legacy workspace directory (pre-refactor: was the repo root clone)
-# Kept this data in REPO_DIR instead; old path confuses git operations
-OLD_WORKSPACE="${STATE_DIR}/workspace"
-if [ -d "${OLD_WORKSPACE}/.git" ]; then
-  echo "[startup] removing legacy workspace at ${OLD_WORKSPACE}"
-  rm -rf "${OLD_WORKSPACE}"
+# Remove legacy repo directory (pre-refactor: was a nested repo/workspace/ structure)
+OLD_REPO="${STATE_DIR}/repo"
+if [ -d "${OLD_REPO}" ] && [ ! -d "${WORKSPACE_DIR}/.git" ]; then
+  echo "[startup] migrating from legacy repo dir at ${OLD_REPO}"
+  rm -rf "${OLD_REPO}"
 fi
 
 # ── 1. Clone or pull the banana repo ─────────────────────────────────────────
-# Full repo lives at REPO_DIR; agent workspace is repo/workspace/ subdirectory
+# Repo root IS the workspace; agent files (AGENTS.md, SOUL.md etc.) live at root
 if [ -n "${GITHUB_TOKEN}" ]; then
   REPO_URL="https://${GITHUB_TOKEN}@github.com/hixi-hyi/banana"
-  if [ -d "${REPO_DIR}/.git" ]; then
+  if [ -d "${WORKSPACE_DIR}/.git" ]; then
     echo "[startup] repo: pulling latest"
-    git -C "${REPO_DIR}" remote set-url origin "${REPO_URL}" 2>/dev/null || true
-    git -C "${REPO_DIR}" pull --ff-only origin main 2>&1 || echo "[startup] git pull skipped (local changes?)"
+    git -C "${WORKSPACE_DIR}" remote set-url origin "${REPO_URL}" 2>/dev/null || true
+    git -C "${WORKSPACE_DIR}" pull --ff-only origin main 2>&1 || echo "[startup] git pull skipped (local changes?)"
   else
     echo "[startup] repo: cloning"
     # Remove directory if it exists but has no .git (e.g. partial previous clone)
-    rm -rf "${REPO_DIR}"
-    git clone "${REPO_URL}" "${REPO_DIR}" 2>&1
+    rm -rf "${WORKSPACE_DIR}"
+    git clone "${REPO_URL}" "${WORKSPACE_DIR}" 2>&1
   fi
   # git config for auto-push (used by heartbeat)
   git config --global user.email "banana-railway@openclaw"
@@ -43,6 +40,7 @@ if [ -n "${GITHUB_TOKEN}" ]; then
   chmod 600 /root/.git-credentials
   echo "[startup] git credentials configured"
 fi
+
 
 # ── 2. Agent auth profile (API key) ──────────────────────────────────────────
 if [ -n "${ANTHROPIC_API_KEY}" ]; then

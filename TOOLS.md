@@ -38,3 +38,51 @@ Skills are shared. Your setup is yours. Keeping them apart means you can update 
 ---
 
 Add whatever helps you do your job. This is your cheat sheet.
+
+## リポジトリ構成（重要）
+
+```
+/home/node/.openclaw/workspace/   ← git リポジトリルート = エージェントのワークスペース
+├── AGENTS.md, SOUL.md, IDENTITY.md ...  ← エージェントファイル（ここが "home"）
+├── memory/, skills/
+├── openclaw-config-base.json
+└── runtime/                      ← デプロイ設定（Dockerfile等。git push しない）
+```
+
+**git 操作は `/home/node/.openclaw/workspace/` で行う（= リポジトリルート）。**
+
+ファイルを書いて commit する場合:
+```
+git -C /home/node/.openclaw/workspace add AGENTS.md SOUL.md MEMORY.md ...
+git -C /home/node/.openclaw/workspace commit -m "..."
+git -C /home/node/.openclaw/workspace push
+```
+
+⚠️ **`git add -A` や `git add .` は使わない** — runtime/ 等の infra ファイルが混入する。
+
+## Git 設定
+
+- リモート: `https://github.com/hixi-hyi/banana`
+- user.name: `Banana (Railway)` / user.email: `banana-railway@openclaw`
+- **認証**: `GITHUB_TOKEN` 環境変数で渡されている
+  - push コマンド: `git -C /home/node/.openclaw/workspace push`（credentials は `/root/.git-credentials` に設定済み）
+  - ⚠️ `git remote set-url` でトークンを埋め込むと TTY なし環境で失敗するので上記方法を使う
+
+## Environment Notes
+
+### Logs
+
+- ログファイル: `/tmp/openclaw/openclaw-YYYY-MM-DD.log`
+- 読み方: `cat /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log | python3 -c "import sys,json; [print(l.get('1','')) for line in sys.stdin if (l:=json.loads(line.strip()))]"`
+
+### Gateway (Railway/Docker環境)
+
+- systemd は使えない（Docker内のため）
+- **安全な再起動:** `kill -USR1 $(pgrep openclaw-gateway)` — プロセスを落とさずに設定を再読み込み
+- ⚠️ `kill -HUP` や `kill` は使わない（セッションが切れる）
+
+### Railway 接続
+
+- SSH: `railway ssh` (プロジェクト選択後)
+- ログ: `railway logs`
+- 詳細は `runtime/RAILWAY.md` 参照

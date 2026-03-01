@@ -29,7 +29,7 @@
           }
         }
       },
-      "workspace": "/home/node/.openclaw/repo/workspace",
+      "workspace": "/home/node/.openclaw/workspace",
       "contextPruning": {
         "mode": "cache-ttl",
         "ttl": "1h"
@@ -49,7 +49,7 @@
       {
         "id": "banana",
         "name": "Banana",
-        "workspace": "/home/node/.openclaw/repo/workspace",
+        "workspace": "/home/node/.openclaw/workspace",
         "agentDir": "/home/node/.openclaw/agents/banana/agent",
         "identity": {
           "name": "Banana",
