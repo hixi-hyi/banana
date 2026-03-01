@@ -5,12 +5,27 @@
       "workspace": "cloudbrains",
       "type": "mention",
       "from": "takegamm",
-      "text": "<@U017Y2ADY4X|hixi>\n\nお手漉きでレビュー&amp;適用お願いします。bastionに環境変数を入れる対応です。\n<https://github.com/cloudbrains/lansmart-infra/pull/16>",
+      "summary": "bastionに環境変数を入れるPRのレビューと適用を依頼",
+      "main_text": "<@U017Y2ADY4X|hixi>\n\nお手漉きでレビュー&amp;適用お願いします。bastionに環境変数を入れる対応です。\n<https://github.com/cloudbrains/lansmart-infra/pull/16>",
+      "thread_messages": [],
       "ts": "1772077443.570189",
       "permalink": "https://cloudbrains.slack.com/archives/C01JVFE87LZ/p1772077443570189?thread_ts=1772077443.570189",
       "status": "pending",
-      "added_at": "2026-03-01T21:39:51.405439+09:00"
+      "added_at": "2026-03-01T13:33:05.531467+00:00"
+    },
+    {
+      "id": "cloudbrains:C01JVFE87LZ:1772272417.049799",
+      "workspace": "cloudbrains",
+      "type": "pushpin",
+      "from": "gami",
+      "summary": "📌 ピン留めメッセージ",
+      "main_text": "あと、先日お話した↓ですが、来月中にやりたいなと思ってます。\n\n<https://cloudbrains.slack.com/archives/C01JVFE87LZ/p1768554272245829>",
+      "thread_messages": [],
+      "ts": "1772272417.049799",
+      "permalink": "https://cloudbrains.slack.com/archives/C01JVFE87LZ/p1772272417049799",
+      "status": "pending",
+      "added_at": "2026-03-01T14:12:08.534162+00:00"
     }
   ],
-  "last_updated": "2026-03-01T21:39:51.406338+09:00"
+  "last_updated": "2026-03-01T14:12:19.457258+00:00"
 }
