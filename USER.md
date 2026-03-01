@@ -19,6 +19,10 @@ _Learn about the person you're helping. Update this as you go._
     - **自分で確認する**（read/exec で実際の状態検証）
     - 同じ操作を繰り返さない（最大2回まで）
     - 検証結果を報告する（failed で終わらない）
+  - 二重投稿が発生したら：
+    - `message delete` で重複したメッセージを削除（古い方、または重複している方）
+    - NO_REPLY が本文に混じったメッセージも削除する
+    - 削除後に「整理しました」と簡潔に報告
   - Slack 通知ルール：
     - 定期通知系（朝レポート、タスク管理など）→ `C0AHUGG1C82` チャンネルに送る
     - **Morning Report**: 毎日10:00 UTC に自動実行 (OpenClaw cron scheduler via `cron-jobs.json`)
