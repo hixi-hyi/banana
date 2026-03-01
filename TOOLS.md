@@ -39,6 +39,32 @@ Skills are shared. Your setup is yours. Keeping them apart means you can update 
 
 Add whatever helps you do your job. This is your cheat sheet.
 
+## openclaw 設定の変更と同期（重要）
+
+openclaw の設定（チャンネル設定、モデル設定など）を変更した場合は、必ず git に同期すること。
+
+### 設定変更のワークフロー
+
+1. openclaw のコマンドや設定変更を行う（openclaw.json が更新される）
+2. 以下のコマンドで git に同期する：
+
+```bash
+node /home/node/.openclaw/workspace/runtime/scripts/config-sync-container
+```
+
+このスクリプトが行うこと：
+- `/home/node/.openclaw/openclaw.json` を読み込む
+- token 等の秘密情報を `__FROM_ENV__` に置換（git に秘密情報を入れない）
+- Railway 固有の設定（gateway.bind 等）を base 値に戻す
+- `openclaw-config-base.json` に書き出して commit & push
+
+### なぜ必要か
+
+- `openclaw.json` は Railway volume にあり、コンテナが再構築されると内容が `openclaw-config-base.json`（git）で上書きされる
+- 同期しないと設定変更が次回デプロイ時に失われる
+
+---
+
 ## リポジトリ構成（重要）
 
 ```

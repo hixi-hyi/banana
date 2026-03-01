@@ -1,0 +1,73 @@
+#!/usr/bin/env node
+// openclaw.json を sanitize して openclaw-config-base.json に同期し、git push する
+// Usage: node /home/node/.openclaw/workspace/runtime/scripts/config-sync-container
+//        (コンテナ内から実行すること)
+'use strict';
+
+const fs = require('fs');
+const { execSync } = require('child_process');
+
+const STATE_DIR = process.env.OPENCLAW_STATE_DIR || '/home/node/.openclaw';
+const WORKSPACE_DIR = `${STATE_DIR}/workspace`;
+const SRC = `${STATE_DIR}/openclaw.json`;
+const DEST = `${WORKSPACE_DIR}/openclaw-config-base.json`;
+
+// token 系のキーを __FROM_ENV__ に置換する
+const SENSITIVE_KEYS = new Set(['botToken', 'appToken', 'token', 'key', 'apiKey', 'password', 'secret']);
+
+function sanitize(obj) {
+  if (Array.isArray(obj)) return obj.map(sanitize);
+  if (obj !== null && typeof obj === 'object') {
+    const result = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (SENSITIVE_KEYS.has(k) && typeof v === 'string' && v.length > 10) {
+        result[k] = '__FROM_ENV__';
+      } else {
+        result[k] = sanitize(v);
+      }
+    }
+    return result;
+  }
+  return obj;
+}
+
+// startup.sh が毎回上書きする Railway 固有の設定を base 値に戻す
+// (これらはコンテナ上だと Railway 値になっているが、base には不要)
+function restoreBaseGateway(config) {
+  if (!config.gateway) return config;
+  const gw = { ...config.gateway };
+
+  // startup.sh が強制するフィールドを削除 (次回 startup.sh が再設定する)
+  delete gw.trustedProxies;
+  gw.bind = 'loopback';
+  gw.controlUi = { allowedOrigins: ['http://127.0.0.1:18789'] };
+  gw.auth = { mode: 'none', token: '__FROM_ENV__' };
+
+  return { ...config, gateway: gw };
+}
+
+// --- main ---
+console.log(`[config-sync] Reading ${SRC}`);
+const raw = JSON.parse(fs.readFileSync(SRC, 'utf8'));
+const sanitized = sanitize(restoreBaseGateway(raw));
+
+console.log(`[config-sync] Writing ${DEST}`);
+fs.writeFileSync(DEST, JSON.stringify(sanitized, null, 2) + '\n');
+
+// diff 表示
+try {
+  const diff = execSync(`git -C "${WORKSPACE_DIR}" diff openclaw-config-base.json`, { encoding: 'utf8' });
+  if (diff) {
+    console.log('[config-sync] Changes:');
+    console.log(diff);
+  } else {
+    console.log('[config-sync] No changes.');
+    process.exit(0);
+  }
+} catch (_) {}
+
+// commit & push
+execSync(`git -C "${WORKSPACE_DIR}" add openclaw-config-base.json`, { stdio: 'inherit' });
+execSync(`git -C "${WORKSPACE_DIR}" commit -m "chore: sync openclaw config [auto]"`, { stdio: 'inherit' });
+execSync(`git -C "${WORKSPACE_DIR}" push`, { stdio: 'inherit' });
+console.log('[config-sync] Done. Pushed to git.');
