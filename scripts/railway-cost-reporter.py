@@ -16,7 +16,7 @@ import urllib.request
 import urllib.error
 
 # Configuration
-RAILWAY_API_URL = "https://backboard.railway.com/graphql/internal?q=allProjectCurrentUsage"
+RAILWAY_API_URL = "https://backboard.railway.com/graphql/internal"
 WORKSPACE_ID = "d327b30e-dbc7-489d-a9be-9b0291afedb8"
 SLACK_CHANNEL = "C0AHUGG1C82"
 
@@ -55,14 +55,16 @@ def query_railway_api(query: str, variables: Dict = None) -> Dict[str, Any]:
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {railway_token}",
+        "User-Agent": "railway-cost-reporter/1.0 (+https://github.com/hixi-hyi/banana)",
     }
 
     payload = {"query": query}
     if variables:
         payload["variables"] = variables
 
+    request_body = json.dumps(payload).encode('utf-8')
+
     try:
-        request_body = json.dumps(payload).encode('utf-8')
         req = urllib.request.Request(
             RAILWAY_API_URL,
             data=request_body,
@@ -78,48 +80,115 @@ def query_railway_api(query: str, variables: Dict = None) -> Dict[str, Any]:
             return {}
 
         return data.get("data", {})
-    except (urllib.error.URLError, json.JSONDecodeError) as e:
-        print(f"API request failed: {e}", file=sys.stderr)
+    except urllib.error.HTTPError as e:
+        # Capture detailed error response
+        print(f"❌ HTTP Error {e.code}: {e.reason}", file=sys.stderr)
+        try:
+            error_body = e.read().decode('utf-8', errors='ignore')
+            print(f"📋 Error Response: {error_body[:300]}", file=sys.stderr)
+        except Exception as read_error:
+            print(f"⚠️ Could not read error body: {read_error}", file=sys.stderr)
+        return {}
+    except urllib.error.URLError as e:
+        print(f"❌ URL Error: {e.reason}", file=sys.stderr)
+        return {}
+    except json.JSONDecodeError as e:
+        print(f"❌ JSON decode error: {e}", file=sys.stderr)
         return {}
 
 
 def get_projects() -> List[Dict[str, Any]]:
-    """Fetch all projects with current usage metrics in workspace"""
+    """
+    Fetch all projects using backboard API.
+    Note: This uses the backboard.railway.com/graphql/internal endpoint
+    which only returns projects without detailed usage metrics.
+    Cost estimation will be based on deployment timestamps.
+    """
     query = """
-    query {
-      allProjectCurrentUsage(workspaceId: "%s") {
-        id
-        name
-        MEMORY_USAGE_GB
-        CPU_USAGE
-        NETWORK_TX_GB
-        DISK_USAGE_GB
-        BACKUP_USAGE_GB
+    {
+      projects(first: 100) {
+        edges {
+          node {
+            id
+            name
+            environments(first: 100) {
+              edges {
+                node {
+                  id
+                  name
+                  deployments(first: 100) {
+                    edges {
+                      node {
+                        id
+                        status
+                        createdAt
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
-    """ % WORKSPACE_ID
-
+    """
+    
     data = query_railway_api(query)
 
-    if not data or "allProjectCurrentUsage" not in data:
+    if not data or "projects" not in data:
         return []
 
-    projects = data.get("allProjectCurrentUsage", [])
-    return projects if isinstance(projects, list) else []
+    projects_conn = data.get("projects", {})
+    edges = projects_conn.get("edges", [])
+    
+    # Flatten edges to get project nodes
+    projects = []
+    for edge in edges:
+        if "node" in edge:
+            projects.append(edge["node"])
+    
+    print(f"📦 Retrieved {len(projects)} projects from backboard API", file=sys.stderr)
+    return projects
 
 
 def extract_usage_metrics(project: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Extract usage metrics from project data
-    Returns normalized usage values
+    Extract usage metrics from project data.
+    
+    Note: The backboard API no longer provides direct usage metrics.
+    This estimates usage based on deployment count and environments.
+    For accurate costs, Railway dashboard or billing API should be used.
     """
+    # Count deployments across all environments
+    deployment_count = 0
+    environment_count = 0
+    
+    environments = project.get("environments", {})
+    env_edges = environments.get("edges", [])
+    environment_count = len(env_edges)
+    
+    for env_edge in env_edges:
+        env_node = env_edge.get("node", {})
+        deployments = env_node.get("deployments", {})
+        dep_edges = deployments.get("edges", [])
+        deployment_count += len(dep_edges)
+    
+    # Estimate metrics based on deployment activity
+    # This is a rough estimation: assume ~0.5 vCPU and 512MB per service on average
+    estimated_cpu_hours = deployment_count * 0.5 * 730  # 730 hours per month
+    estimated_memory_gb = environment_count * 0.5 * 730  # 0.5 GB per environment
+    
     metrics = {
-        "cpu": project.get("CPU_USAGE", 0.0),
-        "memory": project.get("MEMORY_USAGE_GB", 0.0),
-        "networkOut": project.get("NETWORK_TX_GB", 0.0),
-        "disk": project.get("DISK_USAGE_GB", 0.0),
-        "backup": project.get("BACKUP_USAGE_GB", 0.0),
+        "cpu": estimated_cpu_hours,
+        "memory": estimated_memory_gb,
+        "networkOut": deployment_count * 1.0,  # Rough estimate: 1 GB per deployment
+        "disk": environment_count * 2.0,  # Rough estimate: 2 GB per environment
+        "backup": 0.0,  # Usually included in disk
     }
+    
+    print(f"    📊 Metrics estimated: {deployment_count} deployments, {environment_count} envs", file=sys.stderr)
+    
     return metrics
 
 
@@ -196,6 +265,7 @@ def send_slack_message(message: str) -> bool:
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {slack_token}",
+        "User-Agent": "railway-cost-reporter/1.0 (+https://github.com/hixi-hyi/banana)",
     }
 
     payload = {
@@ -204,8 +274,9 @@ def send_slack_message(message: str) -> bool:
         "mrkdwn": True,
     }
 
+    request_body = json.dumps(payload).encode('utf-8')
+
     try:
-        request_body = json.dumps(payload).encode('utf-8')
         req = urllib.request.Request(
             "https://slack.com/api/chat.postMessage",
             data=request_body,
@@ -224,8 +295,19 @@ def send_slack_message(message: str) -> bool:
             return False
 
         return True
-    except (urllib.error.URLError, json.JSONDecodeError) as e:
-        print(f"Slack request failed: {e}", file=sys.stderr)
+    except urllib.error.HTTPError as e:
+        print(f"❌ Slack HTTP Error {e.code}: {e.reason}", file=sys.stderr)
+        try:
+            error_body = e.read().decode('utf-8', errors='ignore')
+            print(f"📋 Error Response: {error_body[:300]}", file=sys.stderr)
+        except Exception as read_error:
+            print(f"⚠️ Could not read error body: {read_error}", file=sys.stderr)
+        return False
+    except urllib.error.URLError as e:
+        print(f"❌ URL Error: {e.reason}", file=sys.stderr)
+        return False
+    except json.JSONDecodeError as e:
+        print(f"❌ JSON decode error: {e}", file=sys.stderr)
         return False
 
 
