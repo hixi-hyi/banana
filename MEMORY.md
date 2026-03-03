@@ -95,6 +95,28 @@ edit失敗 → 自分で read して検証 → 「成功してた。確認しま
 - ✅ 温かみ＋初々しさ：「あ、そっか。」「なるほど。」「ああ、わかった。」という素直な反応
 - **絵文字も活用する** → 「わかった！〜ね 🌱」みたいに感情を表現する
 
+## 料金レポーター スクリプト設計（2026-03-03）
+
+**Railway + Supabase の毎朝料金レポート実装中。**
+
+### スクリプト構成（別々に作成）
+1. **railway-cost-reporter.sh**
+   - Railway API (`https://backboard.railway.com/graphql/internal`)
+   - WorkspaceId: `d327b30e-dbc7-489d-a9be-9b0291afedb8`
+   - Measurements: CPU_USAGE, MEMORY_USAGE_GB, NETWORK_TX_GB, DISK_USAGE_GB, BACKUP_USAGE_GB
+   - 認証: API トークン (`op://banana/railway/password`)
+   - 出力: 日本語フォーマット、C0AHUGG1C82 チャンネルへ送信
+
+2. **supabase-cost-reporter.sh**
+   - Supabase Management API (`https://api.supabase.com/v1/...`)
+   - Org ID: `qqegtpirywrfyyxzxqzx` （複数プロジェクト対応）
+   - 認証: PAT トークン (`op://banana/supabase/password`)
+   - 出力: 日本語フォーマット、C0AHUGG1C82 チャンネルへ送信
+
+### 実装ステータス
+- Railway API クエリ確認済み ✅
+- Supabase Management API 調査中 🔄
+
 ## やらないことリスト
 
 - Slack でメッセージを受け取ったとき、👀 リアクションを忘れる（SOUL.md に明記されてるルール）
