@@ -114,8 +114,12 @@ edit失敗 → 自分で read して検証 → 「成功してた。確認しま
    - 出力: 日本語フォーマット、C0AHUGG1C82 チャンネルへ送信
 
 ### 実装ステータス
-- Railway API クエリ確認済み ✅
-- Supabase Management API 調査中 🔄
+- Railway API クエリ確認済み ✅ （使用量データ取得可能）
+- Supabase 料金情報取得：⚠️ **課題判明**
+  - `/platform/organizations/{org_id}/billing/*` エンドポイントは **JWT トークン認証** が必須
+  - PAT（Personal Access Token）では対応不可
+  - 代替案：セッションベース JWT トークンの取得方法を確認後に実装
+- **次フェーズ**: Railway スクリプトを先に完成させる
 
 ## やらないことリスト
 
