@@ -12,7 +12,8 @@ import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Any
 import subprocess
-import requests
+import urllib.request
+import urllib.error
 
 # Configuration
 RAILWAY_API_URL = "https://api.railway.app/graphql"
@@ -61,16 +62,23 @@ def query_railway_api(query: str, variables: Dict = None) -> Dict[str, Any]:
         payload["variables"] = variables
 
     try:
-        response = requests.post(RAILWAY_API_URL, json=payload, headers=headers)
-        response.raise_for_status()
-        data = response.json()
+        request_body = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(
+            RAILWAY_API_URL,
+            data=request_body,
+            headers=headers,
+            method='POST'
+        )
+        
+        with urllib.request.urlopen(req) as response:
+            data = json.loads(response.read().decode('utf-8'))
 
         if "errors" in data:
             print(f"GraphQL errors: {data['errors']}", file=sys.stderr)
             return {}
 
         return data.get("data", {})
-    except requests.RequestException as e:
+    except (urllib.error.URLError, json.JSONDecodeError) as e:
         print(f"API request failed: {e}", file=sys.stderr)
         return {}
 
@@ -240,13 +248,16 @@ def send_slack_message(message: str) -> bool:
     }
 
     try:
-        response = requests.post(
+        request_body = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(
             "https://slack.com/api/chat.postMessage",
-            json=payload,
+            data=request_body,
             headers=headers,
+            method='POST'
         )
-        response.raise_for_status()
-        result = response.json()
+        
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode('utf-8'))
 
         if not result.get("ok"):
             print(
@@ -256,7 +267,7 @@ def send_slack_message(message: str) -> bool:
             return False
 
         return True
-    except requests.RequestException as e:
+    except (urllib.error.URLError, json.JSONDecodeError) as e:
         print(f"Slack request failed: {e}", file=sys.stderr)
         return False
 
