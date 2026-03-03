@@ -37,11 +37,11 @@ echo "[startup] git credentials configured"
 
 # ── 3. Inject Anthropic API key into auth-profiles.json ──────────────────────
 echo "[startup] injecting auth-profiles.json"
-op inject -i "${WORKSPACE_DIR}/runtime/auth-profiles.json" -o "${AGENT_DIR}/auth-profiles.json"
+op inject --force -i "${WORKSPACE_DIR}/runtime/auth-profiles.json" -o "${AGENT_DIR}/auth-profiles.json"
 
 # ── 4. Inject all secrets into openclaw.json ─────────────────────────────────
 echo "[startup] injecting openclaw.json"
-op inject -i "${WORKSPACE_DIR}/openclaw.json" -o "${CONFIG}"
+op inject --force -i "${WORKSPACE_DIR}/openclaw.json" -o "${CONFIG}"
 
 # ── 5. Launch gateway ─────────────────────────────────────────────────────────
 PORT="${PORT:-8080}"
