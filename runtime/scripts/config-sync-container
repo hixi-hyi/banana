@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// openclaw.json を sanitize して openclaw-config-base.json に同期し、git push する
+// openclaw.json（volume上の実値）→ workspace/openclaw.json（テンプレート）に同期して git push する
 // Usage: node /home/node/.openclaw/workspace/runtime/scripts/config-sync-container
 //        (コンテナ内から実行すること)
 'use strict';
@@ -10,53 +10,39 @@ const { execSync } = require('child_process');
 const STATE_DIR = process.env.OPENCLAW_STATE_DIR || '/home/node/.openclaw';
 const WORKSPACE_DIR = `${STATE_DIR}/workspace`;
 const SRC = `${STATE_DIR}/openclaw.json`;
-const DEST = `${WORKSPACE_DIR}/openclaw-config-base.json`;
+const DEST = `${WORKSPACE_DIR}/openclaw.json`;
 
-// token 系のキーを __FROM_ENV__ に置換する
-const SENSITIVE_KEYS = new Set(['botToken', 'appToken', 'token', 'key', 'apiKey', 'password', 'secret']);
+// 実値を 1Password テンプレート参照に戻すマッピング
+// キー: JSON パス（ドット区切り）、値: op:// テンプレート参照
+const OP_REFS = {
+  'channels.slack.botToken':  '{{ op://banana/slack-bot/password }}',
+  'channels.slack.appToken':  '{{ op://banana/slack-app/password }}',
+  'channels.discord.token':   '{{ op://banana/discord/password }}',
+  'gateway.auth.token':       '{{ op://banana/openclaw-gateway/password }}',
+};
 
-function sanitize(obj) {
-  if (Array.isArray(obj)) return obj.map(sanitize);
-  if (obj !== null && typeof obj === 'object') {
-    const result = {};
-    for (const [k, v] of Object.entries(obj)) {
-      if (SENSITIVE_KEYS.has(k) && typeof v === 'string' && v.length > 10) {
-        result[k] = '__FROM_ENV__';
-      } else {
-        result[k] = sanitize(v);
-      }
-    }
-    return result;
+function restoreOpRefs(obj, path = '') {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map((v, i) => restoreOpRefs(v, `${path}.${i}`));
+  const result = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const currentPath = path ? `${path}.${k}` : k;
+    result[k] = OP_REFS[currentPath] !== undefined
+      ? OP_REFS[currentPath]
+      : restoreOpRefs(v, currentPath);
   }
-  return obj;
+  return result;
 }
 
-// startup.sh が毎回上書きする Railway 固有の設定を base 値に戻す
-// (これらはコンテナ上だと Railway 値になっているが、base には不要)
-function restoreBaseGateway(config) {
-  if (!config.gateway) return config;
-  const gw = { ...config.gateway };
-
-  // startup.sh が強制するフィールドを削除 (次回 startup.sh が再設定する)
-  delete gw.trustedProxies;
-  gw.bind = 'loopback';
-  gw.controlUi = { allowedOrigins: ['http://127.0.0.1:18789'] };
-  gw.auth = { mode: 'none', token: '__FROM_ENV__' };
-
-  return { ...config, gateway: gw };
-}
-
-// --- main ---
 console.log(`[config-sync] Reading ${SRC}`);
 const raw = JSON.parse(fs.readFileSync(SRC, 'utf8'));
-const sanitized = sanitize(restoreBaseGateway(raw));
+const template = restoreOpRefs(raw);
 
 console.log(`[config-sync] Writing ${DEST}`);
-fs.writeFileSync(DEST, JSON.stringify(sanitized, null, 2) + '\n');
+fs.writeFileSync(DEST, JSON.stringify(template, null, 2) + '\n');
 
-// diff 表示
 try {
-  const diff = execSync(`git -C "${WORKSPACE_DIR}" diff openclaw-config-base.json`, { encoding: 'utf8' });
+  const diff = execSync(`git -C "${WORKSPACE_DIR}" diff openclaw.json`, { encoding: 'utf8' });
   if (diff) {
     console.log('[config-sync] Changes:');
     console.log(diff);
@@ -66,8 +52,7 @@ try {
   }
 } catch (_) {}
 
-// commit & push
-execSync(`git -C "${WORKSPACE_DIR}" add openclaw-config-base.json`, { stdio: 'inherit' });
+execSync(`git -C "${WORKSPACE_DIR}" add openclaw.json`, { stdio: 'inherit' });
 execSync(`git -C "${WORKSPACE_DIR}" commit -m "chore: sync openclaw config [auto]"`, { stdio: 'inherit' });
 execSync(`git -C "${WORKSPACE_DIR}" push`, { stdio: 'inherit' });
 console.log('[config-sync] Done. Pushed to git.');

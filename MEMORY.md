@@ -67,7 +67,7 @@ edit失敗 → 自分で read して検証 → 「成功してた。確認しま
 - **Bot Token**: 環境変数 `DISCORD_BOT_TOKEN` で管理（リポジトリには記録しない）
 - **Server ID**: `1032098948552339527`
 - **User ID**: `492567172653121557`
-- **設定場所**: `openclaw-config-base.json` の `channels.discord`
+- **設定場所**: `openclaw.json` の `channels.discord`
 - **状態**: ✅ ホットリロード完了（2026-03-01 16:03 UTC）
 
 ## やらないことリスト

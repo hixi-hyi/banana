@@ -11,7 +11,7 @@
    ```
 2. 変更があれば以下を実行（**エージェントファイルのみ** add すること）:
    ```
-   git -C /home/node/.openclaw/workspace add AGENTS.md SOUL.md IDENTITY.md MEMORY.md HEARTBEAT.md TOOLS.md USER.md BOOTSTRAP.md openclaw-config-base.json memory/ skills/ 2>/dev/null || true
+   git -C /home/node/.openclaw/workspace add AGENTS.md SOUL.md IDENTITY.md MEMORY.md HEARTBEAT.md TOOLS.md USER.md BOOTSTRAP.md openclaw.json memory/ skills/ 2>/dev/null || true
    git -C /home/node/.openclaw/workspace commit -m "chore: auto-sync [heartbeat]"
    git -C /home/node/.openclaw/workspace push
    ```

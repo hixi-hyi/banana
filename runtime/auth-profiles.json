@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "profiles": {
+    "anthropic:default": {
+      "type": "api_key",
+      "provider": "anthropic",
+      "key": "{{ op://banana/anthropic/password }}"
+    }
+  },
+  "usageStats": {}
+}

@@ -3,14 +3,16 @@ FROM ghcr.io/openclaw/openclaw:latest
 # Switch to root for Railway (volume permissions, system package installs)
 USER root
 
-COPY startup.sh /startup.sh
+COPY runtime/startup.sh /startup.sh
 RUN chmod +x /startup.sh
 
-# startup.sh handles config patching and gateway launch
-ENTRYPOINT ["/startup.sh"]
+# Install 1Password CLI for secret injection at startup
+RUN apt-get update \
+    && apt-get install -y curl gpg \
+    && curl -sS https://downloads.1password.com/linux/debian/amd64/stable/1password-cli-amd64-latest.deb -o /tmp/op.deb \
+    && apt-get install -y /tmp/op.deb \
+    && rm /tmp/op.deb \
+    && rm -rf /var/lib/apt/lists/*
 
-# Add custom tools here as needed
-# Example: 1Password CLI
-# RUN curl -sS https://downloads.1password.com/linux/debian/amd64/stable/1password-cli-amd64-latest.deb -o /tmp/op.deb \
-#     && dpkg -i /tmp/op.deb \
-#     && rm /tmp/op.deb
+# startup.sh fetches secrets from 1Password and launches the gateway
+ENTRYPOINT ["/startup.sh"]

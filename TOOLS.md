@@ -41,33 +41,31 @@ Add whatever helps you do your job. This is your cheat sheet.
 
 ## openclaw 設定の変更と同期（重要）
 
-openclaw の設定（チャンネル設定、モデル設定など）を変更すると `openclaw.json`（volume）が更新される。
-**git commit のたびに pre-commit フックが自動で `openclaw-config-base.json` に同期するため、通常は何もしなくてよい。**
+openclaw の設定（チャンネル設定、モデル設定など）を変更すると `/home/node/.openclaw/openclaw.json`（volume）が更新される。
+変更をリポジトリに反映するには `config-sync-container` を実行すること。
 
-### 自動同期の仕組み
+### 仕組み
 
 ```
-openclaw が設定変更 → openclaw.json 更新
+openclaw が設定変更 → /home/node/.openclaw/openclaw.json 更新（実値）
      ↓
-banana が何らかの git commit をする
+config-sync-container を実行
      ↓
-pre-commit フック（.githooks/pre-commit）が自動実行
-     ↓
-openclaw.json を sanitize（token → __FROM_ENV__）して
-openclaw-config-base.json に書き出し → git add（今回の commit に含まれる）
+シークレットフィールドを {{ op://... }} 参照に戻して
+workspace/openclaw.json に書き出し → commit → push
 ```
 
-### 手動で強制 sync したい場合
+### 手動で sync する場合
 
 ```bash
 node /home/node/.openclaw/workspace/runtime/scripts/config-sync-container
 ```
 
-（sanitize → write → commit → push まで一括実行）
+（op:// 参照に戻す → write → commit → push まで一括実行）
 
 ### なぜ必要か
 
-- `openclaw.json` は Railway volume にあり、コンテナ再構築時に `openclaw-config-base.json`（git）で上書きされる
+- `/home/node/.openclaw/openclaw.json` は Railway volume にあり、コンテナ再構築時に `op inject` で `workspace/openclaw.json`（git）から再生成される
 - 同期しないと設定変更が次回デプロイ時に失われる
 
 ---
@@ -78,7 +76,7 @@ node /home/node/.openclaw/workspace/runtime/scripts/config-sync-container
 /home/node/.openclaw/workspace/   ← git リポジトリルート = エージェントのワークスペース
 ├── AGENTS.md, SOUL.md, IDENTITY.md ...  ← エージェントファイル（ここが "home"）
 ├── memory/, skills/
-├── openclaw-config-base.json
+├── openclaw.json                 ← openclaw 設定（op://参照でシークレット管理）
 └── runtime/                      ← デプロイ設定（Dockerfile等。git push しない）
 ```
 
@@ -97,8 +95,8 @@ git -C /home/node/.openclaw/workspace push
 
 - リモート: `https://github.com/hixi-hyi/banana`
 - user.name: `Banana (Railway)` / user.email: `banana-railway@openclaw`
-- **認証**: `GITHUB_TOKEN` 環境変数で渡されている
-  - push コマンド: `git -C /home/node/.openclaw/workspace push`（credentials は `/root/.git-credentials` に設定済み）
+- **認証**: 起動時に `op read "op://banana/github/token"` で取得し `/root/.git-credentials` に設定済み
+  - push コマンド: `git -C /home/node/.openclaw/workspace push`
   - ⚠️ `git remote set-url` でトークンを埋め込むと TTY なし環境で失敗するので上記方法を使う
 
 ## Environment Notes

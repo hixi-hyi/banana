@@ -1,7 +1,7 @@
 {
   "meta": {
     "lastTouchedVersion": "2026.2.26",
-    "lastTouchedAt": "2026-02-27T15:18:30.954Z"
+    "lastTouchedAt": "2026-02-28T13:34:24.723Z"
   },
   "wizard": {
     "lastRunAt": "2026-02-27T12:41:32.258Z",
@@ -38,7 +38,8 @@
         "mode": "safeguard"
       },
       "heartbeat": {
-        "every": "30m"
+        "every": "30m",
+        "target": "last"
       },
       "maxConcurrent": 4,
       "subagents": {
@@ -53,7 +54,7 @@
         "agentDir": "/home/node/.openclaw/agents/banana/agent",
         "identity": {
           "name": "Banana",
-          "emoji": "\ud83c\udf4c"
+          "emoji": "🍌"
         }
       }
     ]
@@ -82,21 +83,23 @@
       "mode": "socket",
       "webhookPath": "/slack/events",
       "enabled": true,
-      "botToken": "__FROM_ENV__",
-      "appToken": "__FROM_ENV__",
+      "botToken": "{{ op://banana/slack-bot/password }}",
+      "appToken": "{{ op://banana/slack-app/password }}",
       "userTokenReadOnly": true,
       "groupPolicy": "open",
       "streaming": "partial",
-      "nativeStreaming": true,
+      "nativeStreaming": false,
       "channels": {
         "C0AHBC2B3GB": {
           "requireMention": false
         }
-      }
+      },
+      "allowBots": true,
+      "blockStreaming": false
     },
     "discord": {
       "enabled": true,
-      "token": "__FROM_ENV__",
+      "token": "{{ op://banana/discord/password }}",
       "groupPolicy": "allowlist",
       "guilds": {
         "1032098948552339527": {
@@ -110,23 +113,26 @@
   "gateway": {
     "port": 18789,
     "mode": "local",
-    "bind": "loopback",
+    "bind": "lan",
     "reload": {
       "mode": "hot"
     },
     "controlUi": {
-      "allowedOrigins": [
-        "http://127.0.0.1:18789"
-      ]
+      "dangerouslyAllowHostHeaderOriginFallback": true,
+      "allowInsecureAuth": true
     },
     "auth": {
-      "mode": "none",
-      "token": "__FROM_ENV__"
+      "mode": "token",
+      "token": "{{ op://banana/openclaw-gateway/password }}"
     },
     "tailscale": {
       "mode": "off",
       "resetOnExit": false
-    }
+    },
+    "trustedProxies": [
+      "127.0.0.1",
+      "100.64.0.0/10"
+    ]
   },
   "plugins": {
     "entries": {

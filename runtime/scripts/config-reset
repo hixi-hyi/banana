@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # openclaw.json をリセットして再デプロイする
-# openclaw-config-base.json を元に startup.sh が再構築する
+# startup.sh が op inject で openclaw.json（git）を再展開する
 # Usage: ./config-reset
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 echo "[config-reset] WARNING: This will redeploy and rebuild openclaw.json from scratch."
-echo "[config-reset] Runtime-generated data (sessions, device pairings, etc.) will be preserved via deep merge."
+echo "[config-reset] Secrets will be re-injected from 1Password via op inject."
 read -p "Continue? [y/N] " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then

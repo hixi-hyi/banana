@@ -12,17 +12,27 @@
 
 | 変数名 | 用途 |
 |--------|------|
-| `ANTHROPIC_API_KEY` | Claude API 認証 |
-| `SLACK_BOT_TOKEN` | Slack Bot トークン |
-| `SLACK_APP_TOKEN` | Slack App トークン（Socket Mode） |
-| `OPENCLAW_GATEWAY_TOKEN` | Web UI 認証トークン |
-| `GITHUB_TOKEN` | ワークスペース git clone/push 用 |
+| `OP_SERVICE_ACCOUNT_TOKEN` | 1Password Service Account トークン（これ1つですべての秘密を取得） |
 | `OPENCLAW_STATE_DIR` | `/home/node/.openclaw` |
 | `SETUP_PASSWORD` | `/setup` ページのパスワード |
 
-## よく使うスクリプト（`runtime/scripts/` 以下）
+以前は `ANTHROPIC_API_KEY`, `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `DISCORD_BOT_TOKEN`,
+`OPENCLAW_GATEWAY_TOKEN`, `GITHUB_TOKEN` を個別に設定していたが、すべて 1Password に移行済み。
 
-リポジトリルートから実行すること。
+## 1Password Vault 構成
+
+Vault 名: `banana`
+
+| アイテム名 | フィールド | 用途 |
+|-----------|-----------|------|
+| `github` | `password` | GitHub clone/push 用 PAT |
+| `anthropic` | `password` | Claude API キー |
+| `slack-bot` | `password` | Slack Bot トークン |
+| `slack-app` | `password` | Slack App トークン（Socket Mode） |
+| `discord` | `password` | Discord Bot トークン |
+| `openclaw-gateway` | `password` | Web UI 認証トークン |
+
+## よく使うスクリプト（リポジトリルートから実行）
 
 | スクリプト | 用途 |
 |-----------|------|
@@ -33,20 +43,16 @@
 | `./runtime/scripts/ssh [コマンド]` | コンテナに SSH（引数なしでシェル起動） |
 | `./runtime/scripts/config-get [jqフィルタ]` | コンテナ上の openclaw.json を確認 |
 | `./runtime/scripts/config-reset` | openclaw.json をリセットして再デプロイ |
-| `./runtime/scripts/config-sync` | ローカル設定を sanitize して openclaw-config-base.json に同期 |
 
 ## リポジトリ構成
 
 ```
 banana/
 ├── railway.toml          # Railway CLI 用（root 必須）
-├── workspace/            # エージェントの人格・記憶（openclaw ワークスペース）
-│   ├── AGENTS.md
-│   ├── SOUL.md / IDENTITY.md / MEMORY.md / USER.md
-│   ├── HEARTBEAT.md / TOOLS.md / BOOTSTRAP.md
-│   ├── openclaw-config-base.json
-│   ├── memory/
-│   └── skills/
+├── openclaw.json         # openclaw 設定（op://参照でシークレットを管理）
+├── AGENTS.md / SOUL.md / IDENTITY.md / MEMORY.md / USER.md
+├── HEARTBEAT.md / TOOLS.md
+├── memory/
 └── runtime/              # 実行環境（このファイルもここ）
     ├── Dockerfile
     ├── startup.sh
@@ -54,36 +60,38 @@ banana/
     └── RAILWAY.md
 ```
 
-## 同期されているファイル（git → Railway）
-
-起動時に `runtime/startup.sh` がリポジトリ全体を `/home/node/.openclaw/repo/` に clone/pull し、Railway に反映される：
-
-| パス | 内容 |
-|------|------|
-| `workspace/AGENTS.md` | ワークスペースルール |
-| `workspace/SOUL.md` | エージェントの核心 |
-| `workspace/IDENTITY.md` | アイデンティティ |
-| `workspace/MEMORY.md` | 長期記憶 |
-| `workspace/USER.md` | ユーザー情報 |
-| `workspace/HEARTBEAT.md` | ハートビート設定 |
-| `workspace/TOOLS.md` | ツール設定 |
-| `workspace/openclaw-config-base.json` | openclaw 設定ベース（秘密情報なし） |
-| `workspace/memory/` | 日次ログ |
-| `runtime/startup.sh` | 起動スクリプト |
-
-**秘密情報（git には入れない）:** API キー、Slack トークン、Gateway トークン → Railway の環境変数で管理
-
 ## startup.sh の処理フロー（毎回起動時）
 
-1. リポジトリ全体を `/home/node/.openclaw/repo/` に clone/pull
-2. エージェントワークスペース = `repo/workspace/`（ここに AGENTS.md 等が入る）
-3. git 認証情報を設定（GITHUB_TOKEN → `/root/.git-credentials`）
-4. `ANTHROPIC_API_KEY` を `agents/banana/agent/auth-profiles.json` に書き込む
-5. `repo/workspace/openclaw-config-base.json` を読んで既存の `openclaw.json` と deep merge
-6. Railway 固有の設定を上書き（bind=lan, trustedProxies, allowInsecureAuth 等）
-7. Slack トークンを env var から注入
-8. 無効なフィールド（dmPolicy 等）を削除
-9. `openclaw gateway run` で起動
+1. `op read "op://banana/github/token"` → `GITHUB_TOKEN` を取得
+2. リポジトリ全体を `/home/node/.openclaw/workspace/` に clone/pull
+3. git 認証情報を設定（`/root/.git-credentials`）
+4. `op read "op://banana/anthropic/credential"` → `auth-profiles.json` に書き込む
+5. `op inject -i workspace/openclaw.json -o openclaw.json` → シークレットを展開
+6. `openclaw gateway run` で起動
+
+必要な Railway 環境変数は **`OP_SERVICE_ACCOUNT_TOKEN` のみ**。
+
+## openclaw.json の管理
+
+`openclaw.json` はリポジトリに直接コミットされている。シークレット部分は `{{ op://... }}` 形式の
+テンプレート参照になっているため、git に入れても安全。
+
+起動時に `op inject` が参照を実値に展開して `/home/node/.openclaw/openclaw.json` に書き出す。
+
+### 設定を変更したいとき
+
+openclaw の設定を変更すると `/home/node/.openclaw/openclaw.json`（volume）が更新される。
+変更をリポジトリに反映するには `config-sync-container` を実行する：
+
+```bash
+railway ssh -- node /home/node/.openclaw/workspace/runtime/scripts/config-sync-container
+```
+
+または Banana に頼む：
+
+```
+node /home/node/.openclaw/workspace/runtime/scripts/config-sync-container
+```
 
 ## 何か問題が起きたときの対処
 
@@ -96,10 +104,11 @@ banana/
 
 | エラー | 原因 | 対処 |
 |--------|------|------|
-| `Invalid config: channels.slack.dmPolicy` | エージェントが openclaw.json に無効な値を書いた | `railway up --detach` で再デプロイ（startup.sh が修正する） |
-| `non-loopback Control UI requires ...allowedOrigins` | gateway の設定不足 | startup.sh に `dangerouslyAllowHostHeaderOriginFallback=true` が入っているので再デプロイで直る |
+| `OP_SERVICE_ACCOUNT_TOKEN not set` | Railway の env var 未設定 | Railway ダッシュボードで設定 |
+| `[AUTH] 401 Unauthorized` | 1Password トークン期限切れ | Service Account を再生成 |
+| `Invalid config: channels.slack.dmPolicy` | エージェントが openclaw.json に無効な値を書いた | `railway up --detach` で再デプロイ |
 | `EACCES: permission denied` | ボリュームのパーミッション問題 | Dockerfile が `USER root` になっているか確認 |
-| `pairing required` | ブラウザが未承認デバイス | `railway ssh` → `openclaw devices list` → `openclaw devices approve <id>` |
+| `pairing required` | ブラウザが未承認デバイス | `railway ssh` → `openclaw devices approve <id>` |
 
 ### openclaw.json を直接修正したい
 
@@ -117,42 +126,15 @@ console.log('done');
 
 ### 設定をリセットしたい
 
-再デプロイすれば `runtime/startup.sh` が `workspace/openclaw-config-base.json`（git 上のベース設定）を読み直して再構築する：
+再デプロイすれば `startup.sh` が `openclaw.json`（git）を `op inject` で再展開する：
 
 ```bash
 railway up --detach
 ```
 
-### ローカルの設定変更を Railway に反映したい
-
-1. `~/.openclaw/openclaw.json` の秘密情報を除いた版を `workspace/openclaw-config-base.json` に更新
-2. git commit & push
-3. Railway を再デプロイ（または次回再起動時に自動反映）
-
-```bash
-# ローカル設定を sanitize してリポジトリに保存するコマンド（リポジトリルートで実行）
-cat ~/.openclaw/openclaw.json | python3 -c "
-import json, sys
-d = json.load(sys.stdin)
-def sanitize(obj):
-    if isinstance(obj, dict):
-        result = {}
-        for k, v in obj.items():
-            if k in {'botToken', 'appToken', 'key', 'token'} and isinstance(v, str) and len(v) > 10:
-                result[k] = '__FROM_ENV__'
-            else:
-                result[k] = sanitize(v)
-        return result
-    elif isinstance(obj, list):
-        return [sanitize(i) for i in obj]
-    return obj
-print(json.dumps(sanitize(d), indent=2))
-" > workspace/openclaw-config-base.json
-```
-
 ### ローカルで docker-compose を使う
 
 ```bash
-# リポジトリルートから実行
+# OP_SERVICE_ACCOUNT_TOKEN を .env に追加してから
 docker compose -f runtime/docker-compose.yml up
 ```
