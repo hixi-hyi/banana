@@ -22,6 +22,28 @@
         "bestEffort": true
       },
       "enabled": true
+    },
+    {
+      "jobId": "railway-cost-reporter",
+      "name": "Railway Cost Reporter",
+      "description": "Daily Railway usage cost report at 10:00 UTC",
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 10 * * *",
+        "tz": "UTC"
+      },
+      "sessionTarget": "isolated",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Run the Railway cost reporter: python3 /home/node/.openclaw/workspace/scripts/railway-cost-reporter.py"
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "slack",
+        "to": "channel:C0AHUGG1C82",
+        "bestEffort": true
+      },
+      "enabled": true
     }
   ]
 }
