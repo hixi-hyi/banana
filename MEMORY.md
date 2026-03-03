@@ -38,11 +38,13 @@
 - 対応ルール化：二重投稿に気づいたら `message delete` で削除
 - ただしインスタンス重複がないか確認してから整理すべき
 
-## モデル設定（2026-02-27）
+## モデル設定（2026-02-27 / 2026-03-03 更新）
 
 - **デフォルト**: `claude-haiku-4-5` に設定
-- **複雑タスク**: `sessions_spawn()` で Sonnet のサブエージェントを明示的に起動
-- banana が判断して使い分ける（OpenClaw に自動切り替えはない）
+- **コーディングタスク**: **常に Sonnet のサブエージェントを使う** ✅ 重要（2026-03-03 hixi ルール）
+  - `sessions_spawn(runtime="subagent", agentId="...", task="...")` で Sonnet を起動
+  - banana が自分で実装しようとするな → subagent に任せる
+  - 複雑さの判断は不要。コーディング＝ subagent 判断で OK
 - 設定は `openclaw.json` の `agents.defaults.model.primary`
 
 ## エラーハンドリングルール（2026-03-01）
