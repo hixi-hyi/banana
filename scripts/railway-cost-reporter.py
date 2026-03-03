@@ -16,7 +16,7 @@ import urllib.request
 import urllib.error
 
 # Configuration
-RAILWAY_API_URL = "https://api.railway.app/graphql"
+RAILWAY_API_URL = "https://backboard.railway.com/graphql/internal?q=allProjectCurrentUsage"
 WORKSPACE_ID = "d327b30e-dbc7-489d-a9be-9b0291afedb8"
 SLACK_CHANNEL = "C0AHUGG1C82"
 
@@ -84,86 +84,43 @@ def query_railway_api(query: str, variables: Dict = None) -> Dict[str, Any]:
 
 
 def get_projects() -> List[Dict[str, Any]]:
-    """Fetch all projects in workspace"""
+    """Fetch all projects with current usage metrics in workspace"""
     query = """
-    query GetProjects($workspaceId: String!) {
-      workspace(id: $workspaceId) {
+    query {
+      allProjectCurrentUsage(workspaceId: "%s") {
         id
         name
-        projects {
-          edges {
-            node {
-              id
-              name
-              plugins {
-                edges {
-                  node {
-                    id
-                    name
-                  }
-                }
-              }
-            }
-          }
-        }
+        MEMORY_USAGE_GB
+        CPU_USAGE
+        NETWORK_TX_GB
+        DISK_USAGE_GB
+        BACKUP_USAGE_GB
       }
     }
-    """
+    """ % WORKSPACE_ID
 
-    data = query_railway_api(query, {"workspaceId": WORKSPACE_ID})
+    data = query_railway_api(query)
 
-    if not data or "workspace" not in data:
+    if not data or "allProjectCurrentUsage" not in data:
         return []
 
-    projects = []
-    workspace = data["workspace"]
-
-    if (
-        workspace
-        and "projects" in workspace
-        and "edges" in workspace["projects"]
-    ):
-        for edge in workspace["projects"]["edges"]:
-            if edge and "node" in edge:
-                projects.append(edge["node"])
-
-    return projects
+    projects = data.get("allProjectCurrentUsage", [])
+    return projects if isinstance(projects, list) else []
 
 
-def get_usage_metrics(project_id: str) -> Dict[str, Any]:
+def extract_usage_metrics(project: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Fetch usage metrics for a project
-    Returns aggregated usage for current month to date
+    Extract usage metrics from project data
+    Returns normalized usage values
     """
-    # Calculate date range (month start to today)
-    today = datetime.utcnow()
-    month_start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    month_end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
-
-    query = """
-    query GetMetrics($projectId: String!, $from: DateTime!, $to: DateTime!) {
-      project(id: $projectId) {
-        id
-        name
-        metrics(from: $from, to: $to) {
-          cpu
-          memory
-          networkOut
-          disk
-          backup
-        }
-      }
+    metrics = {
+        "cpu": project.get("CPU_USAGE", 0.0),
+        "memory": project.get("MEMORY_USAGE_GB", 0.0),
+        "networkOut": project.get("NETWORK_TX_GB", 0.0),
+        "disk": project.get("DISK_USAGE_GB", 0.0),
+        "backup": project.get("BACKUP_USAGE_GB", 0.0),
     }
-    """
-
-    variables = {
-        "projectId": project_id,
-        "from": month_start.isoformat() + "Z",
-        "to": month_end.isoformat() + "Z",
-    }
-
-    data = query_railway_api(query, variables)
-    return data.get("project", {})
+    return metrics
 
 
 def calculate_monthly_cost(metrics: Dict[str, Any]) -> Dict[str, float]:
@@ -276,7 +233,7 @@ def main():
     """Main execution"""
     print("🚀 Starting Railway cost reporter...", file=sys.stderr)
 
-    # Fetch projects
+    # Fetch projects with current usage metrics
     projects = get_projects()
     if not projects:
         print(
@@ -291,17 +248,17 @@ def main():
     costs_by_project = {}
 
     for project in projects:
-        project_id = project.get("id")
         project_name = project.get("name", "Unknown")
 
         print(f"  📊 Processing: {project_name}", file=sys.stderr)
 
-        metrics = get_usage_metrics(project_id)
-        if not metrics:
+        # Extract usage metrics from project data
+        metrics = extract_usage_metrics(project)
+        if not any(metrics.values()):
             print(f"    ⚠️  No metrics found for {project_name}", file=sys.stderr)
             continue
 
-        costs = calculate_monthly_cost(metrics.get("metrics", {}))
+        costs = calculate_monthly_cost(metrics)
         costs_by_project[project_name] = costs
 
     # Format and send report
