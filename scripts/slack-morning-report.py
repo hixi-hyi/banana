@@ -17,7 +17,7 @@ TASKS_FILE = WORKSPACE / "memory/slack-tasks.json"
 # OpenClaw Slack Bot Token (環境変数から取得)
 # banana の Slack 接続トークン
 BANANA_SLACK_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
-BANANA_CHANNEL = "C0AHUGG1C82"  # #通知
+BANANA_CHANNEL = "C0AHUGG1C82"  # pending タスク通知先チャンネル
 
 
 def slack_post(token, channel, text):
