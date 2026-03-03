@@ -25,6 +25,7 @@ _Learn about the person you're helping. Update this as you go._
     - 削除後に「整理しました」と簡潔に報告
   - Slack 通知ルール：
     - 定期通知系（朝レポート、タスク管理など）→ `C0AHUGG1C82` チャンネルに送る
+    - Morning Report（毎日23:00 UTC）：pending タスク一覧 → C0AHUGG1C82 へ
     - **Morning Report**: 毎日10:00 UTC に自動実行 (OpenClaw cron scheduler via `cron-jobs.json`)
 
 ## Context
