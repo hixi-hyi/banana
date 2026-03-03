@@ -1,5 +1,5 @@
 [build]
-dockerfile = "Dockerfile"
+dockerfile = "runtime/Dockerfile"
 
 [deploy]
 restartPolicyType = "on_failure"
