@@ -117,3 +117,42 @@ git -C /home/node/.openclaw/workspace push
 - SSH: `railway ssh` (プロジェクト選択後)
 - ログ: `railway logs`
 - 詳細は `runtime/RAILWAY.md` 参照
+
+---
+
+## 借金管理スプレッドシート
+
+hixi の借金（120万円）の利用記録を管理するスプレッドシート。
+
+**スプレッドシート:** https://docs.google.com/spreadsheets/d/1KVGjNshPbFWPXbDQTRwieQHNwEAFnjAqO-AxdPjan9w/edit
+
+### トリガーパターン
+
+以下のようなメッセージを受け取ったら、金額と用途を解釈してスクリプトを実行する:
+
+- 「〇〇〇〇円利用」
+- 「〇〇に〇〇〇〇円使った」
+- 「〇〇〇〇円 〇〇で利用」
+- 「借金に〇〇〇〇円追加して」
+
+自然言語から **金額**（円）と **用途** を抽出して実行すること。
+
+### 実行コマンド
+
+```bash
+python3 /home/node/.openclaw/workspace/scripts/loan-tracker.py \
+  --purpose "用途" \
+  --amount 金額（整数）\
+  [--date YYYY-MM-DD]  # 省略時は今日のJST
+```
+
+### 実行例
+
+```bash
+python3 /home/node/.openclaw/workspace/scripts/loan-tracker.py --purpose "食費" --amount 5000
+python3 /home/node/.openclaw/workspace/scripts/loan-tracker.py --purpose "交通費" --amount 3000 --date 2026-03-01
+```
+
+### 実行後
+
+スクリプトの出力（記録した内容・残高の変化）をそのままユーザーに返す。
