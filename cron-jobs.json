@@ -44,6 +44,28 @@
         "bestEffort": true
       },
       "enabled": true
+    },
+    {
+      "jobId": "supabase-cost-reporter",
+      "name": "Supabase Cost Reporter",
+      "description": "Daily Supabase estimated cost report at 10:05 UTC",
+      "schedule": {
+        "kind": "cron",
+        "expr": "5 10 * * *",
+        "tz": "UTC"
+      },
+      "sessionTarget": "isolated",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Run the Supabase cost reporter: python3 /home/node/.openclaw/workspace/scripts/supabase-cost-reporter.py"
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "slack",
+        "to": "channel:C0AHUGG1C82",
+        "bestEffort": true
+      },
+      "enabled": true
     }
   ]
 }
