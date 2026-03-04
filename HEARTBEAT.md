@@ -1,5 +1,14 @@
 # HEARTBEAT.md
 
+## Git Auto-Pull
+
+他のマシンからの設定変更を反映させるため、定期的に pull する。
+
+手順:
+```bash
+git -C /home/node/.openclaw/workspace pull
+```
+
 ## Git Auto-Push
 
 ワークスペース（`/home/node/.openclaw/workspace/`）のエージェントファイルに変更があれば、commit して push する。
