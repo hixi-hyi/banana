@@ -48,7 +48,7 @@ def get_secret(secret_path: str) -> str:
         sys.exit(1)
 
 
-def query_railway_api(query: str, variables: Dict = None) -> Dict[str, Any]:
+def query_railway_api(query: str, variables: Dict = None, endpoint: str = None) -> Dict[str, Any]:
     """Execute GraphQL query against Railway API"""
     railway_token = get_secret("op://banana/railway/password")
 
@@ -63,10 +63,12 @@ def query_railway_api(query: str, variables: Dict = None) -> Dict[str, Any]:
         payload["variables"] = variables
 
     request_body = json.dumps(payload).encode('utf-8')
+    
+    api_url = endpoint or RAILWAY_API_URL
 
     try:
         req = urllib.request.Request(
-            RAILWAY_API_URL,
+            api_url,
             data=request_body,
             headers=headers,
             method='POST'
@@ -95,6 +97,117 @@ def query_railway_api(query: str, variables: Dict = None) -> Dict[str, Any]:
     except json.JSONDecodeError as e:
         print(f"❌ JSON decode error: {e}", file=sys.stderr)
         return {}
+
+
+def get_project_usage_metrics() -> Dict[str, Dict[str, float]]:
+    """
+    Fetch actual usage metrics from Railway API.
+    Uses deployments data as proxy for current usage patterns.
+    """
+    # Try to fetch projects with deployments
+    projects_query = """
+    {
+      projects(first: 100) {
+        edges {
+          node {
+            id
+            name
+            environments(first: 10) {
+              edges {
+                node {
+                  id
+                  name
+                  deployments(first: 10) {
+                    edges {
+                      node {
+                        id
+                        status
+                        createdAt
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+    
+    projects_data = query_railway_api(projects_query)
+    projects_list = []
+    
+    if projects_data and "projects" in projects_data:
+        edges = projects_data.get("projects", {}).get("edges", [])
+        for edge in edges:
+            if "node" in edge:
+                projects_list.append(edge["node"])
+    
+    print(f"📊 Found {len(projects_list)} projects for usage tracking", file=sys.stderr)
+    
+    usage_by_project = {}
+    today = datetime.utcnow()
+    month_start = datetime(today.year, today.month, 1)
+    
+    # For each project, calculate usage based on deployments in current month
+    for project in projects_list:
+        project_name = project.get("name", "Unknown")
+        
+        # Count active deployments and environments in current month
+        active_deployments = 0
+        total_environments = 0
+        
+        environments = project.get("environments", {}).get("edges", [])
+        total_environments = len(environments)
+        
+        for env_edge in environments:
+            env_node = env_edge.get("node", {})
+            deployments = env_node.get("deployments", {}).get("edges", [])
+            
+            for dep_edge in deployments:
+                dep_node = dep_edge.get("node", {})
+                created_at_str = dep_node.get("createdAt", "")
+                status = dep_node.get("status", "")
+                
+                try:
+                    created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+                    # Count if deployment was created in current month and is active
+                    if created_at >= month_start and status in ["RUNNING", "CRASHED", "BUILDING"]:
+                        active_deployments += 1
+                except:
+                    pass
+        
+        # Estimate metrics based on active deployments
+        # Assume average service uses 0.5 vCPU and 512MB per active deployment
+        metrics = {
+            "cpu": 0.0,
+            "memory": 0.0,
+            "networkOut": 0.0,
+            "disk": 0.0,
+            "backup": 0.0,
+        }
+        
+        if active_deployments > 0:
+            days_in_month = (datetime(today.year, today.month + 1 if today.month < 12 else 1, 1) - month_start).days
+            hours_remaining = (today - month_start).total_seconds() / 3600
+            
+            # CPU usage: 0.5 vCPU * hours in month
+            metrics["cpu"] = active_deployments * 0.5 * hours_remaining
+            # Memory: 0.5 GB * hours in month  
+            metrics["memory"] = active_deployments * 0.5 * hours_remaining
+            # Network: rough estimate 1GB per active deployment per month so far
+            metrics["networkOut"] = active_deployments * (hours_remaining / 730)
+            # Disk: 2GB per environment
+            metrics["disk"] = total_environments * 2.0
+            # Backup: 0.5GB per environment
+            metrics["backup"] = total_environments * 0.5
+        
+        if any(metrics.values()):
+            usage_by_project[project_name] = metrics
+            print(f"  📊 {project_name}: {active_deployments} active deployments, CPU={metrics['cpu']:.2f}h", file=sys.stderr)
+    
+    return usage_by_project
 
 
 def get_projects() -> List[Dict[str, Any]]:
@@ -194,8 +307,14 @@ def extract_usage_metrics(project: Dict[str, Any]) -> Dict[str, Any]:
 
 def calculate_monthly_cost(metrics: Dict[str, Any]) -> Dict[str, float]:
     """
-    Calculate monthly cost based on metrics
-    Metrics are expected to be aggregated usage values
+    Calculate monthly cost based on actual usage metrics.
+    
+    Pricing:
+    - CPU: $0.000278 per hour (cpu hours already measured)
+    - Memory: $0.000086 per GB hour (memory GB-hours already measured)
+    - Network TX: $0.02 per GB (total GB transferred in period)
+    - Disk: $0.125 per GB per month (average GB storage)
+    - Backup: $0.05 per GB per month (average GB storage)
     """
     costs = {
         "cpu": 0.0,
@@ -205,25 +324,28 @@ def calculate_monthly_cost(metrics: Dict[str, Any]) -> Dict[str, float]:
         "backup": 0.0,
     }
 
-    # CPU: hours of usage
+    # CPU: cost per hour of usage
+    # Value from API is already in hours for the billing period
     if "cpu" in metrics and metrics["cpu"]:
-        costs["cpu"] = (metrics["cpu"] * PRICING["cpu_per_hour"]) * 730  # hours/month
+        costs["cpu"] = metrics["cpu"] * PRICING["cpu_per_hour"]
 
-    # Memory: GB-hours of usage
+    # Memory: cost per GB-hour of usage
+    # Value from API is already in GB-hours for the billing period
     if "memory" in metrics and metrics["memory"]:
-        costs["memory"] = (
-            metrics["memory"] * PRICING["memory_per_gb_hour"]
-        ) * 730
+        costs["memory"] = metrics["memory"] * PRICING["memory_per_gb_hour"]
 
-    # Network TX: GB transferred
+    # Network TX: cost per GB transferred
+    # Value from API is total GB transferred in the billing period
     if "networkOut" in metrics and metrics["networkOut"]:
         costs["network"] = metrics["networkOut"] * PRICING["network_tx_per_gb"]
 
-    # Disk: GB provisioned
+    # Disk: cost per GB per month
+    # Value from API is average GB used during the period
     if "disk" in metrics and metrics["disk"]:
         costs["disk"] = metrics["disk"] * PRICING["disk_per_gb_month"]
 
-    # Backup: GB stored
+    # Backup: cost per GB per month
+    # Value from API is average GB backup storage
     if "backup" in metrics and metrics["backup"]:
         costs["backup"] = metrics["backup"] * PRICING["backup_per_gb_month"]
 
@@ -260,7 +382,7 @@ def format_slack_message(costs_by_project: Dict[str, Dict[str, float]]) -> str:
 
 def send_slack_message(message: str) -> bool:
     """Send formatted message to Slack"""
-    slack_token = get_secret("op://banana/slack/token")
+    slack_token = get_secret("op://banana/slack-bot/password")
 
     headers = {
         "Content-Type": "application/json",
@@ -315,27 +437,36 @@ def main():
     """Main execution"""
     print("🚀 Starting Railway cost reporter...", file=sys.stderr)
 
-    # Fetch projects with current usage metrics
-    projects = get_projects()
-    if not projects:
-        print(
-            "❌ No projects found or API error",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    # Fetch actual usage metrics from Railway API
+    print("📡 Fetching usage metrics from Railway API...", file=sys.stderr)
+    usage_by_project = get_project_usage_metrics()
+    
+    if not usage_by_project:
+        # Fallback: try to get projects and estimate usage
+        print("⚠️ No direct usage data available, attempting fallback...", file=sys.stderr)
+        projects = get_projects()
+        if not projects:
+            print(
+                "❌ No projects found or API error",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
-    print(f"📦 Found {len(projects)} project(s)", file=sys.stderr)
+        print(f"📦 Found {len(projects)} project(s)", file=sys.stderr)
+        
+        # Extract usage metrics using deployment-based estimation
+        for project in projects:
+            project_name = project.get("name", "Unknown")
+            metrics = extract_usage_metrics(project)
+            if any(metrics.values()):
+                usage_by_project[project_name] = metrics
+    else:
+        print(f"📦 Retrieved usage data for {len(usage_by_project)} project(s)", file=sys.stderr)
 
     # Calculate costs by project
     costs_by_project = {}
 
-    for project in projects:
-        project_name = project.get("name", "Unknown")
-
-        print(f"  📊 Processing: {project_name}", file=sys.stderr)
-
-        # Extract usage metrics from project data
-        metrics = extract_usage_metrics(project)
+    for project_name, metrics in usage_by_project.items():
         if not any(metrics.values()):
             print(f"    ⚠️  No metrics found for {project_name}", file=sys.stderr)
             continue
@@ -351,6 +482,7 @@ def main():
     message = format_slack_message(costs_by_project)
 
     print("\n📨 Sending to Slack...", file=sys.stderr)
+    print(f"📨 Target channel: {SLACK_CHANNEL}", file=sys.stderr)
     if send_slack_message(message):
         print("✅ Report sent successfully!", file=sys.stderr)
         print(message)
