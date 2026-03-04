@@ -92,6 +92,10 @@
       "channels": {
         "C0AHBC2B3GB": {
           "requireMention": false
+        },
+        "C093DSHHRSN": {
+          "allow": true,
+          "users": ["U02F8EGBTRQ"]
         }
       },
       "allowBots": true,
