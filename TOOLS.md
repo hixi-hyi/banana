@@ -126,33 +126,37 @@ hixi の借金（120万円）の利用記録を管理するスプレッドシー
 
 **スプレッドシート:** https://docs.google.com/spreadsheets/d/1KVGjNshPbFWPXbDQTRwieQHNwEAFnjAqO-AxdPjan9w/edit
 
-### トリガーパターン
+### トリガー：メッセージに「借金」という単語が含まれていたら即実行
 
-以下のようなメッセージを受け取ったら、金額と用途を解釈してスクリプトを実行する:
+確認不要。聞き返さずにそのまま実行すること。
 
-- 「〇〇〇〇円利用」
-- 「〇〇に〇〇〇〇円使った」
-- 「〇〇〇〇円 〇〇で利用」
-- 「借金に〇〇〇〇円追加して」
+**メッセージ例（すべてこのパターンで動く）:**
+- `借金 今井湯 1000円`
+- `借金 食費 5000`
+- `借金 ACMの年会費 28434円`
 
-自然言語から **金額**（円）と **用途** を抽出して実行すること。
+### 金額・用途の抽出ルール
+
+- **用途**: 金額以外の名詞部分（「今井湯」「食費」「ACMの年会費」など）
+- **金額**: 数字部分（円・¥は除去して整数に変換。「1000円」→ 1000）
+- 金額が万円表記の場合: 「1万円」→ 10000、「1.5万」→ 15000
+- 日付の指定がなければ今日のJSTを使う
 
 ### 実行コマンド
 
 ```bash
 python3 /home/node/.openclaw/workspace/scripts/loan-tracker.py \
   --purpose "用途" \
-  --amount 金額（整数）\
-  [--date YYYY-MM-DD]  # 省略時は今日のJST
+  --amount 金額（整数）
 ```
 
 ### 実行例
 
 ```bash
+python3 /home/node/.openclaw/workspace/scripts/loan-tracker.py --purpose "今井湯" --amount 1000
 python3 /home/node/.openclaw/workspace/scripts/loan-tracker.py --purpose "食費" --amount 5000
-python3 /home/node/.openclaw/workspace/scripts/loan-tracker.py --purpose "交通費" --amount 3000 --date 2026-03-01
 ```
 
 ### 実行後
 
-スクリプトの出力（記録した内容・残高の変化）をそのままユーザーに返す。
+スクリプトの出力をそのままユーザーに返す。エラーがあればエラー内容を伝える。
