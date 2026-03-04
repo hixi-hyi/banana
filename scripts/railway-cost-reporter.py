@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Railway Cost Reporter
-- Fetches usage data from Railway GraphQL API
+- Fetches actual usage/estimated data from Railway GraphQL API
 - Calculates costs by project
 - Sends formatted report to Slack
 """
@@ -9,7 +9,7 @@ Railway Cost Reporter
 import json
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from typing import Dict, List, Any
 import subprocess
 import urllib.request
@@ -20,17 +20,22 @@ RAILWAY_API_URL = "https://backboard.railway.com/graphql/internal"
 WORKSPACE_ID = "d327b30e-dbc7-489d-a9be-9b0291afedb8"
 SLACK_CHANNEL = "C0AHUGG1C82"
 
-# Pricing (USD per unit)
+# Railway pricing (per unit)
+# Source: https://docs.railway.app/reference/pricing/plans
+# CPU_USAGE and MEMORY_USAGE_GB API values are in per-MINUTE units.
+# DISK / BACKUP are within the Hobby plan's included 100 GB → $0.
 PRICING = {
-    "cpu_per_hour": 0.000278,
-    "memory_per_gb_hour": 0.000086,
-    "network_tx_per_gb": 0.02,
-    "disk_per_gb_month": 0.125,
-    "backup_per_gb_month": 0.05,
+    "cpu_per_vcpu_minute": 20.0 / 43200,   # $20/vCPU/month ÷ 43200 min
+    "memory_per_gb_minute": 10.0 / 43200,  # $10/GB/month  ÷ 43200 min
+    "network_per_gb": 0.05,                 # $0.05/GB egress
 }
 
-# JPY exchange rate (approximate)
-JPY_RATE = 155.0  # ~155 JPY per USD
+# Day of month the billing cycle starts (check Railway dashboard > Usage)
+BILLING_CYCLE_DAY = 3
+
+MEASUREMENTS = ["MEMORY_USAGE_GB", "CPU_USAGE", "NETWORK_TX_GB", "DISK_USAGE_GB", "BACKUP_USAGE_GB"]
+
+JPY_RATE = 155.0
 
 
 def get_secret(secret_path: str) -> str:
@@ -48,34 +53,33 @@ def get_secret(secret_path: str) -> str:
         sys.exit(1)
 
 
-def query_railway_api(query: str, variables: Dict = None, endpoint: str = None) -> Dict[str, Any]:
+def query_railway_api(query: str, variables: Dict = None) -> Dict[str, Any]:
     """Execute GraphQL query against Railway API"""
     railway_token = get_secret("op://banana/railway/password")
 
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {railway_token}",
-        "User-Agent": "railway-cost-reporter/1.0 (+https://github.com/hixi-hyi/banana)",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+        "Origin": "https://railway.com",
+        "Referer": "https://railway.com/",
     }
 
     payload = {"query": query}
     if variables:
         payload["variables"] = variables
 
-    request_body = json.dumps(payload).encode('utf-8')
-    
-    api_url = endpoint or RAILWAY_API_URL
+    request_body = json.dumps(payload).encode("utf-8")
 
     try:
         req = urllib.request.Request(
-            api_url,
+            RAILWAY_API_URL,
             data=request_body,
             headers=headers,
-            method='POST'
+            method="POST",
         )
-        
-        with urllib.request.urlopen(req) as response:
-            data = json.loads(response.read().decode('utf-8'))
+        with urllib.request.urlopen(req, timeout=30) as response:
+            data = json.loads(response.read().decode("utf-8"))
 
         if "errors" in data:
             print(f"GraphQL errors: {data['errors']}", file=sys.stderr)
@@ -83,301 +87,224 @@ def query_railway_api(query: str, variables: Dict = None, endpoint: str = None) 
 
         return data.get("data", {})
     except urllib.error.HTTPError as e:
-        # Capture detailed error response
-        print(f"❌ HTTP Error {e.code}: {e.reason}", file=sys.stderr)
+        print(f"HTTP Error {e.code}: {e.reason}", file=sys.stderr)
         try:
-            error_body = e.read().decode('utf-8', errors='ignore')
-            print(f"📋 Error Response: {error_body[:300]}", file=sys.stderr)
-        except Exception as read_error:
-            print(f"⚠️ Could not read error body: {read_error}", file=sys.stderr)
+            print(f"Response: {e.read().decode('utf-8', errors='ignore')[:300]}", file=sys.stderr)
+        except Exception:
+            pass
         return {}
     except urllib.error.URLError as e:
-        print(f"❌ URL Error: {e.reason}", file=sys.stderr)
+        print(f"URL Error: {e.reason}", file=sys.stderr)
         return {}
     except json.JSONDecodeError as e:
-        print(f"❌ JSON decode error: {e}", file=sys.stderr)
+        print(f"JSON decode error: {e}", file=sys.stderr)
         return {}
 
 
-def get_project_usage_metrics() -> Dict[str, Dict[str, float]]:
-    """
-    Fetch actual usage metrics from Railway API.
-    Uses deployments data as proxy for current usage patterns.
-    """
-    # Try to fetch projects with deployments
-    projects_query = """
-    {
-      projects(first: 100) {
-        edges {
-          node {
-            id
-            name
-            environments(first: 10) {
-              edges {
-                node {
-                  id
-                  name
-                  deployments(first: 10) {
-                    edges {
-                      node {
-                        id
-                        status
-                        createdAt
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    """
-    
-    projects_data = query_railway_api(projects_query)
-    projects_list = []
-    
-    if projects_data and "projects" in projects_data:
-        edges = projects_data.get("projects", {}).get("edges", [])
-        for edge in edges:
-            if "node" in edge:
-                projects_list.append(edge["node"])
-    
-    print(f"📊 Found {len(projects_list)} projects for usage tracking", file=sys.stderr)
-    
-    usage_by_project = {}
-    today = datetime.utcnow()
-    month_start = datetime(today.year, today.month, 1)
-    
-    # For each project, calculate usage based on deployments in current month
-    for project in projects_list:
-        project_name = project.get("name", "Unknown")
-        
-        # Count active deployments and environments in current month
-        active_deployments = 0
-        total_environments = 0
-        
-        environments = project.get("environments", {}).get("edges", [])
-        total_environments = len(environments)
-        
-        for env_edge in environments:
-            env_node = env_edge.get("node", {})
-            deployments = env_node.get("deployments", {}).get("edges", [])
-            
-            for dep_edge in deployments:
-                dep_node = dep_edge.get("node", {})
-                created_at_str = dep_node.get("createdAt", "")
-                status = dep_node.get("status", "")
-                
-                try:
-                    created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
-                    # Count if deployment was created in current month and is active
-                    if created_at >= month_start and status in ["RUNNING", "CRASHED", "BUILDING"]:
-                        active_deployments += 1
-                except:
-                    pass
-        
-        # Estimate metrics based on active deployments
-        # Assume average service uses 0.5 vCPU and 512MB per active deployment
-        metrics = {
-            "cpu": 0.0,
-            "memory": 0.0,
-            "networkOut": 0.0,
-            "disk": 0.0,
-            "backup": 0.0,
-        }
-        
-        if active_deployments > 0:
-            days_in_month = (datetime(today.year, today.month + 1 if today.month < 12 else 1, 1) - month_start).days
-            hours_remaining = (today - month_start).total_seconds() / 3600
-            
-            # CPU usage: 0.5 vCPU * hours in month
-            metrics["cpu"] = active_deployments * 0.5 * hours_remaining
-            # Memory: 0.5 GB * hours in month  
-            metrics["memory"] = active_deployments * 0.5 * hours_remaining
-            # Network: rough estimate 1GB per active deployment per month so far
-            metrics["networkOut"] = active_deployments * (hours_remaining / 730)
-            # Disk: 2GB per environment
-            metrics["disk"] = total_environments * 2.0
-            # Backup: 0.5GB per environment
-            metrics["backup"] = total_environments * 0.5
-        
-        if any(metrics.values()):
-            usage_by_project[project_name] = metrics
-            print(f"  📊 {project_name}: {active_deployments} active deployments, CPU={metrics['cpu']:.2f}h", file=sys.stderr)
-    
-    return usage_by_project
+def get_billing_period_start() -> datetime:
+    """Return the start of the current billing period based on BILLING_CYCLE_DAY"""
+    now = datetime.now(timezone.utc)
+    if now.day >= BILLING_CYCLE_DAY:
+        start = datetime(now.year, now.month, BILLING_CYCLE_DAY, tzinfo=timezone.utc)
+    else:
+        # Previous month
+        if now.month == 1:
+            start = datetime(now.year - 1, 12, BILLING_CYCLE_DAY, tzinfo=timezone.utc)
+        else:
+            start = datetime(now.year, now.month - 1, BILLING_CYCLE_DAY, tzinfo=timezone.utc)
+    return start
 
 
-def get_projects() -> List[Dict[str, Any]]:
+def fetch_current_usage(start_date: datetime, end_date: datetime) -> tuple[Dict[str, Dict[str, float]], Dict[str, str]]:
     """
-    Fetch all projects using backboard API.
-    Note: This uses the backboard.railway.com/graphql/internal endpoint
-    which only returns projects without detailed usage metrics.
-    Cost estimation will be based on deployment timestamps.
+    Fetch current month-to-date usage per project.
+    Returns (usage_by_project_id, project_names).
+
+    API units:
+      CPU_USAGE      → vCPU-hours
+      MEMORY_USAGE_GB → GB-minutes
+      NETWORK_TX_GB  → GB
+      DISK_USAGE_GB  → GB-hours
+      BACKUP_USAGE_GB → GB-hours
     """
     query = """
-    {
-      projects(first: 100) {
+    query allProjectCurrentUsage(
+      $workspaceId: String
+      $usageMeasurements: [MetricMeasurement!]!
+      $startDate: DateTime!
+      $endDate: DateTime!
+      $includeDeleted: Boolean
+      $useSmallDateChunks: Boolean
+    ) {
+      usage(
+        workspaceId: $workspaceId
+        measurements: $usageMeasurements
+        groupBy: [PROJECT_ID]
+        startDate: $startDate
+        endDate: $endDate
+        includeDeleted: $includeDeleted
+        useSmallDateChunks: $useSmallDateChunks
+      ) {
+        measurement
+        value
+        tags {
+          projectId
+        }
+      }
+      projects(first: 5000 includeDeleted: true workspaceId: $workspaceId) {
         edges {
           node {
             id
             name
-            environments(first: 100) {
-              edges {
-                node {
-                  id
-                  name
-                  deployments(first: 100) {
-                    edges {
-                      node {
-                        id
-                        status
-                        createdAt
-                      }
-                    }
-                  }
-                }
-              }
-            }
           }
         }
       }
     }
     """
-    
-    data = query_railway_api(query)
 
-    if not data or "projects" not in data:
-        return []
-
-    projects_conn = data.get("projects", {})
-    edges = projects_conn.get("edges", [])
-    
-    # Flatten edges to get project nodes
-    projects = []
-    for edge in edges:
-        if "node" in edge:
-            projects.append(edge["node"])
-    
-    print(f"📦 Retrieved {len(projects)} projects from backboard API", file=sys.stderr)
-    return projects
-
-
-def extract_usage_metrics(project: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Extract usage metrics from project data.
-    
-    Note: The backboard API no longer provides direct usage metrics.
-    This estimates usage based on deployment count and environments.
-    For accurate costs, Railway dashboard or billing API should be used.
-    """
-    # Count deployments across all environments
-    deployment_count = 0
-    environment_count = 0
-    
-    environments = project.get("environments", {})
-    env_edges = environments.get("edges", [])
-    environment_count = len(env_edges)
-    
-    for env_edge in env_edges:
-        env_node = env_edge.get("node", {})
-        deployments = env_node.get("deployments", {})
-        dep_edges = deployments.get("edges", [])
-        deployment_count += len(dep_edges)
-    
-    # Estimate metrics based on deployment activity
-    # This is a rough estimation: assume ~0.5 vCPU and 512MB per service on average
-    estimated_cpu_hours = deployment_count * 0.5 * 730  # 730 hours per month
-    estimated_memory_gb = environment_count * 0.5 * 730  # 0.5 GB per environment
-    
-    metrics = {
-        "cpu": estimated_cpu_hours,
-        "memory": estimated_memory_gb,
-        "networkOut": deployment_count * 1.0,  # Rough estimate: 1 GB per deployment
-        "disk": environment_count * 2.0,  # Rough estimate: 2 GB per environment
-        "backup": 0.0,  # Usually included in disk
-    }
-    
-    print(f"    📊 Metrics estimated: {deployment_count} deployments, {environment_count} envs", file=sys.stderr)
-    
-    return metrics
-
-
-def calculate_monthly_cost(metrics: Dict[str, Any]) -> Dict[str, float]:
-    """
-    Calculate monthly cost based on actual usage metrics.
-    
-    Pricing:
-    - CPU: $0.000278 per hour (cpu hours already measured)
-    - Memory: $0.000086 per GB hour (memory GB-hours already measured)
-    - Network TX: $0.02 per GB (total GB transferred in period)
-    - Disk: $0.125 per GB per month (average GB storage)
-    - Backup: $0.05 per GB per month (average GB storage)
-    """
-    costs = {
-        "cpu": 0.0,
-        "memory": 0.0,
-        "network": 0.0,
-        "disk": 0.0,
-        "backup": 0.0,
+    variables = {
+        "workspaceId": WORKSPACE_ID,
+        "usageMeasurements": MEASUREMENTS,
+        "startDate": start_date.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        "endDate": end_date.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        "includeDeleted": True,
+        "useSmallDateChunks": True,
     }
 
-    # CPU: cost per hour of usage
-    # Value from API is already in hours for the billing period
-    if "cpu" in metrics and metrics["cpu"]:
-        costs["cpu"] = metrics["cpu"] * PRICING["cpu_per_hour"]
+    data = query_railway_api(query, variables)
+    if not data:
+        return {}, {}
 
-    # Memory: cost per GB-hour of usage
-    # Value from API is already in GB-hours for the billing period
-    if "memory" in metrics and metrics["memory"]:
-        costs["memory"] = metrics["memory"] * PRICING["memory_per_gb_hour"]
+    # Build project id → name map (use first occurrence to avoid duplicates)
+    project_names: Dict[str, str] = {}
+    for edge in data.get("projects", {}).get("edges", []):
+        node = edge.get("node", {})
+        pid = node.get("id")
+        name = node.get("name", "Unknown")
+        if pid and pid not in project_names:
+            project_names[pid] = name
 
-    # Network TX: cost per GB transferred
-    # Value from API is total GB transferred in the billing period
-    if "networkOut" in metrics and metrics["networkOut"]:
-        costs["network"] = metrics["networkOut"] * PRICING["network_tx_per_gb"]
+    # Sum usage values per project (multiple chunks with useSmallDateChunks=true)
+    usage: Dict[str, Dict[str, float]] = {}
+    for row in data.get("usage", []):
+        pid = row.get("tags", {}).get("projectId")
+        measurement = row.get("measurement")
+        value = row.get("value") or 0.0
+        if not pid or not measurement:
+            continue
+        if pid not in usage:
+            usage[pid] = {}
+        usage[pid][measurement] = usage[pid].get(measurement, 0.0) + value
 
-    # Disk: cost per GB per month
-    # Value from API is average GB used during the period
-    if "disk" in metrics and metrics["disk"]:
-        costs["disk"] = metrics["disk"] * PRICING["disk_per_gb_month"]
-
-    # Backup: cost per GB per month
-    # Value from API is average GB backup storage
-    if "backup" in metrics and metrics["backup"]:
-        costs["backup"] = metrics["backup"] * PRICING["backup_per_gb_month"]
-
-    return costs
+    return usage, project_names
 
 
-def format_slack_message(costs_by_project: Dict[str, Dict[str, float]]) -> str:
+def fetch_estimated_usage() -> Dict[str, Dict[str, float]]:
+    """
+    Fetch end-of-billing-period estimated usage per project.
+    Returns usage_by_project_id with same measurement keys.
+    """
+    query = """
+    query allProjectEstimatedUsage(
+      $workspaceId: String
+      $usageMeasurements: [MetricMeasurement!]!
+      $includeDeleted: Boolean
+    ) {
+      estimatedUsage(
+        workspaceId: $workspaceId
+        measurements: $usageMeasurements
+        includeDeleted: $includeDeleted
+      ) {
+        measurement
+        estimatedValue
+        projectId
+      }
+    }
+    """
+
+    variables = {
+        "workspaceId": WORKSPACE_ID,
+        "usageMeasurements": MEASUREMENTS,
+        "includeDeleted": True,
+    }
+
+    data = query_railway_api(query, variables)
+    if not data:
+        return {}
+
+    estimated: Dict[str, Dict[str, float]] = {}
+    for row in data.get("estimatedUsage", []):
+        pid = row.get("projectId")
+        measurement = row.get("measurement")
+        value = row.get("estimatedValue") or 0.0
+        if not pid or not measurement:
+            continue
+        if pid not in estimated:
+            estimated[pid] = {}
+        estimated[pid][measurement] = value
+
+    return estimated
+
+
+def calculate_cost(usage: Dict[str, float]) -> float:
+    """Calculate total cost (USD) from usage metrics.
+
+    Units from Railway API:
+      CPU_USAGE       → vCPU-minutes
+      MEMORY_USAGE_GB → GB-minutes
+      NETWORK_TX_GB   → GB
+      DISK/BACKUP     → within Hobby 100 GB free tier → $0
+    """
+    cpu = usage.get("CPU_USAGE", 0.0) * PRICING["cpu_per_vcpu_minute"]
+    memory = usage.get("MEMORY_USAGE_GB", 0.0) * PRICING["memory_per_gb_minute"]
+    network = usage.get("NETWORK_TX_GB", 0.0) * PRICING["network_per_gb"]
+    return cpu + memory + network
+
+
+def format_slack_message(
+    project_names: Dict[str, str],
+    current_usage: Dict[str, Dict[str, float]],
+    estimated_usage: Dict[str, Dict[str, float]],
+    billing_start: datetime,
+    now: datetime,
+) -> str:
     """Format report as Slack message"""
-    today = datetime.utcnow().strftime("%Y年%m月%d日")
+    date_str = now.strftime("%Y年%m月%d日")
+    period_str = f"{billing_start.strftime('%m/%d')}〜{now.strftime('%m/%d')}"
 
-    total_usd = sum(
-        sum(costs.values()) for costs in costs_by_project.values()
-    )
-    total_jpy = total_usd * JPY_RATE
+    # Collect all project IDs that have any usage
+    all_pids = set(current_usage.keys()) | set(estimated_usage.keys())
 
-    message = f"💰 Railway 料金レポート - {today}\n\n"
-    message += f"📊 予測月額合計: ¥{int(total_jpy):,} (${total_usd:.2f})\n\n"
-    message += "プロジェクト別内訳：\n"
+    rows = []
+    total_current = 0.0
+    total_estimated = 0.0
 
-    for project_name, costs in sorted(costs_by_project.items()):
-        project_total = sum(costs.values())
-        project_total_jpy = project_total * JPY_RATE
+    for pid in sorted(all_pids, key=lambda p: project_names.get(p, p)):
+        name = project_names.get(pid, pid[:8])
+        cur = calculate_cost(current_usage.get(pid, {}))
+        est = calculate_cost(estimated_usage.get(pid, {}))
+        if cur == 0.0 and est == 0.0:
+            continue
+        total_current += cur
+        total_estimated += est
+        rows.append((name, cur, est))
 
-        message += f"\n🔹 {project_name}\n"
-        message += f"  CPU: ${costs['cpu']:.4f}\n"
-        message += f"  Memory: ${costs['memory']:.4f}\n"
-        message += f"  Network: ${costs['network']:.4f}\n"
-        message += f"  Disk: ${costs['disk']:.4f}\n"
-        message += f"  Backup: ${costs['backup']:.4f}\n"
-        message += f"  小計: ${project_total:.4f} (≈ ¥{int(project_total_jpy):,})\n"
+    lines = [
+        f"💰 Railway 料金レポート — {date_str}",
+        "",
+        f"📅 請求期間: {period_str}",
+        f"💵 現在の合計: ${total_current:.2f}  (¥{int(total_current * JPY_RATE):,})",
+        f"📈 月末予測合計: ${total_estimated:.2f}  (¥{int(total_estimated * JPY_RATE):,})",
+        "",
+        "プロジェクト別:",
+    ]
 
-    return message
+    for name, cur, est in rows:
+        lines.append(
+            f"  • {name}:  現在 ${cur:.2f}  /  予測 ${est:.2f}  (¥{int(est * JPY_RATE):,})"
+        )
+
+    return "\n".join(lines)
 
 
 def send_slack_message(message: str) -> bool:
@@ -387,7 +314,6 @@ def send_slack_message(message: str) -> bool:
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {slack_token}",
-        "User-Agent": "railway-cost-reporter/1.0 (+https://github.com/hixi-hyi/banana)",
     }
 
     payload = {
@@ -396,98 +322,54 @@ def send_slack_message(message: str) -> bool:
         "mrkdwn": True,
     }
 
-    request_body = json.dumps(payload).encode('utf-8')
+    request_body = json.dumps(payload).encode("utf-8")
 
     try:
         req = urllib.request.Request(
             "https://slack.com/api/chat.postMessage",
             data=request_body,
             headers=headers,
-            method='POST'
+            method="POST",
         )
-        
-        with urllib.request.urlopen(req) as response:
-            result = json.loads(response.read().decode('utf-8'))
+        with urllib.request.urlopen(req, timeout=15) as response:
+            result = json.loads(response.read().decode("utf-8"))
 
         if not result.get("ok"):
-            print(
-                f"Slack API error: {result.get('error', 'Unknown error')}",
-                file=sys.stderr,
-            )
+            print(f"Slack API error: {result.get('error', 'Unknown error')}", file=sys.stderr)
             return False
-
         return True
     except urllib.error.HTTPError as e:
-        print(f"❌ Slack HTTP Error {e.code}: {e.reason}", file=sys.stderr)
-        try:
-            error_body = e.read().decode('utf-8', errors='ignore')
-            print(f"📋 Error Response: {error_body[:300]}", file=sys.stderr)
-        except Exception as read_error:
-            print(f"⚠️ Could not read error body: {read_error}", file=sys.stderr)
+        print(f"Slack HTTP Error {e.code}: {e.reason}", file=sys.stderr)
         return False
     except urllib.error.URLError as e:
-        print(f"❌ URL Error: {e.reason}", file=sys.stderr)
-        return False
-    except json.JSONDecodeError as e:
-        print(f"❌ JSON decode error: {e}", file=sys.stderr)
+        print(f"URL Error: {e.reason}", file=sys.stderr)
         return False
 
 
 def main():
-    """Main execution"""
-    print("🚀 Starting Railway cost reporter...", file=sys.stderr)
+    now = datetime.now(timezone.utc)
+    billing_start = get_billing_period_start()
 
-    # Fetch actual usage metrics from Railway API
-    print("📡 Fetching usage metrics from Railway API...", file=sys.stderr)
-    usage_by_project = get_project_usage_metrics()
-    
-    if not usage_by_project:
-        # Fallback: try to get projects and estimate usage
-        print("⚠️ No direct usage data available, attempting fallback...", file=sys.stderr)
-        projects = get_projects()
-        if not projects:
-            print(
-                "❌ No projects found or API error",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+    print(f"📡 Fetching current usage ({billing_start.strftime('%Y-%m-%d')} → now)...", file=sys.stderr)
+    current_usage, project_names = fetch_current_usage(billing_start, now)
+    print(f"  {len(current_usage)} project(s) with usage data", file=sys.stderr)
 
-        print(f"📦 Found {len(projects)} project(s)", file=sys.stderr)
-        
-        # Extract usage metrics using deployment-based estimation
-        for project in projects:
-            project_name = project.get("name", "Unknown")
-            metrics = extract_usage_metrics(project)
-            if any(metrics.values()):
-                usage_by_project[project_name] = metrics
-    else:
-        print(f"📦 Retrieved usage data for {len(usage_by_project)} project(s)", file=sys.stderr)
+    print("📡 Fetching estimated usage...", file=sys.stderr)
+    estimated_usage = fetch_estimated_usage()
+    print(f"  {len(estimated_usage)} project(s) with estimated data", file=sys.stderr)
 
-    # Calculate costs by project
-    costs_by_project = {}
-
-    for project_name, metrics in usage_by_project.items():
-        if not any(metrics.values()):
-            print(f"    ⚠️  No metrics found for {project_name}", file=sys.stderr)
-            continue
-
-        costs = calculate_monthly_cost(metrics)
-        costs_by_project[project_name] = costs
-
-    # Format and send report
-    if not costs_by_project:
-        print("❌ No cost data to report", file=sys.stderr)
+    if not current_usage and not estimated_usage:
+        print("No usage data available", file=sys.stderr)
         sys.exit(1)
 
-    message = format_slack_message(costs_by_project)
+    message = format_slack_message(project_names, current_usage, estimated_usage, billing_start, now)
 
     print("\n📨 Sending to Slack...", file=sys.stderr)
-    print(f"📨 Target channel: {SLACK_CHANNEL}", file=sys.stderr)
     if send_slack_message(message):
-        print("✅ Report sent successfully!", file=sys.stderr)
+        print("✅ Done", file=sys.stderr)
         print(message)
     else:
-        print("❌ Failed to send Slack message", file=sys.stderr)
+        print("Failed to send Slack message", file=sys.stderr)
         sys.exit(1)
 
 
