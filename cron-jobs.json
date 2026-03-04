@@ -98,22 +98,6 @@
         "bestEffort": true
       },
       "enabled": true
-    },
-    {
-      "jobId": "expense-auto-tracker",
-      "name": "Expense Auto Tracker",
-      "description": "Monitor #banana channel for expense messages and auto-record them",
-      "schedule": {
-        "kind": "cron",
-        "expr": "*/5 * * * *",
-        "tz": "UTC"
-      },
-      "sessionTarget": "isolated",
-      "payload": {
-        "kind": "agentTurn",
-        "message": "Run the expense auto-tracker: python3 /home/node/.openclaw/workspace/scripts/expense-auto-tracker.py"
-      },
-      "enabled": true
     }
   ]
 }
