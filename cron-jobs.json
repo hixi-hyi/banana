@@ -46,6 +46,38 @@
       "enabled": true
     },
     {
+      "jobId": "git-auto-pull",
+      "name": "Git Auto Pull",
+      "description": "Periodic git pull to sync workspace from remote every 5 minutes",
+      "schedule": {
+        "kind": "cron",
+        "expr": "*/5 * * * *",
+        "tz": "UTC"
+      },
+      "sessionTarget": "isolated",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Run the following command and report the output:\ngit -C /home/node/.openclaw/workspace pull"
+      },
+      "enabled": true
+    },
+    {
+      "jobId": "git-auto-push",
+      "name": "Git Auto Push",
+      "description": "Periodic git commit and push of agent files every 5 minutes",
+      "schedule": {
+        "kind": "cron",
+        "expr": "2,7,12,17,22,27,32,37,42,47,52,57 * * * *",
+        "tz": "UTC"
+      },
+      "sessionTarget": "isolated",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Check for changes in the agent workspace and commit/push if any exist.\n\n1. Check status:\n   git -C /home/node/.openclaw/workspace status --porcelain\n2. If there are changes, run the following commands in order:\n   git -C /home/node/.openclaw/workspace add AGENTS.md SOUL.md IDENTITY.md MEMORY.md HEARTBEAT.md TOOLS.md USER.md BOOTSTRAP.md openclaw.json memory/ skills/ 2>/dev/null || true\n   git -C /home/node/.openclaw/workspace commit -m \"chore: auto-sync [cron]\"\n   git -C /home/node/.openclaw/workspace push\n3. If there are no changes, do nothing.\n\nIMPORTANT: Never use `git add -A` or `git add .`. Only add the files explicitly listed above."
+      },
+      "enabled": true
+    },
+    {
       "jobId": "supabase-cost-reporter",
       "name": "Supabase Cost Reporter",
       "description": "Daily Supabase estimated cost report at 10:05 UTC",
