@@ -101,9 +101,9 @@ git -C /home/node/.openclaw/workspace push
 
 ## GitHub CLI (gh) 設定
 
-- **認証**: startup.sh で `gh auth login --with-token` により自動設定
+- **認証**: startup.sh で `GITHUB_TOKEN` 環境変数を 1Password から取得・セット
 - token は 1Password: `op://banana/github/password` から取得
-- Docker 起動時に自動的に gh コマンドが使用可能に
+- Docker 起動時に自動的に `gh` コマンドが使用可能に
 - **使い方**: `gh issue list`, `gh pr view <number>`, `gh issue create` など
 
 ## Environment Notes
