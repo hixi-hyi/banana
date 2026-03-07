@@ -1,4 +1,4 @@
-FROM ghcr.io/openclaw/openclaw:2026.3.2
+FROM ghcr.io/openclaw/openclaw:latest
 # https://github.com/openclaw/openclaw/pkgs/container/openclaw
 
 # Switch to root for Railway (volume permissions, system package installs)
