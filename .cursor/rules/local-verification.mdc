@@ -1,0 +1,57 @@
+---
+description: openclaw 設定変更後のローカル Docker 検証手順
+globs: openclaw.json,runtime/**,runtime/auth-profiles.json
+alwaysApply: false
+---
+
+# ローカル Docker 検証手順
+
+`openclaw.json` や `runtime/` を変更したら Railway デプロイ前にローカルで検証する。
+詳細は `runtime/RAILWAY.md` の「ローカル検証方法」セクション参照。
+
+## 1. イメージビルド（初回 or Dockerfile 変更時）
+
+```bash
+docker build --platform linux/amd64 --no-cache -t openclaw-test -f runtime/Dockerfile .
+# op のパス確認
+docker run --platform linux/amd64 --rm --entrypoint "" openclaw-test which op
+# → /usr/bin/op
+```
+
+## 2. config スキーマ検証（openclaw.json 変更時）
+
+```bash
+docker run --platform linux/amd64 --rm \
+  --entrypoint "" \
+  -e HOME=/home/node \
+  -e OPENCLAW_STATE_DIR=/home/node/.openclaw \
+  -e OPENCLAW_GATEWAY_TOKEN=test-token \
+  -v $(pwd)/openclaw.json:/home/node/.openclaw/openclaw.json \
+  openclaw-test \
+  node /app/openclaw.mjs gateway run --port 18789 --bind loopback --auth token 2>&1 &
+PID=$!; sleep 5; kill $PID 2>/dev/null; wait $PID 2>/dev/null
+```
+
+エラーがなければ OK。`Invalid config: <field>:` が出たらスキーマ違反。
+
+## 3. SecretRef 検証（secrets.providers 変更時）
+
+```bash
+docker run --platform linux/amd64 --rm \
+  --entrypoint "" \
+  -e HOME=/home/node \
+  -e OPENCLAW_STATE_DIR=/home/node/.openclaw \
+  -e OPENCLAW_GATEWAY_TOKEN=test-token \
+  -e OP_SERVICE_ACCOUNT_TOKEN="<トークン>" \
+  -v $(pwd)/openclaw.json:/home/node/.openclaw/openclaw.json \
+  -v $(pwd)/runtime/auth-profiles.json:/home/node/.openclaw/agents/banana/agent/auth-profiles.json \
+  openclaw-test \
+  node /app/openclaw.mjs secrets audit --check 2>&1
+# 正常: Secrets audit: ok. plaintext=0, unresolved=0, ...
+```
+
+## 重要な制約
+
+- `gateway.auth.token` は SecretRef **不可**（string 型のみ）→ 省略して `OPENCLAW_GATEWAY_TOKEN` env var を使う
+- `auth-profiles.json` の `keyRef` は `secrets audit` の対象外
+- Mac (Apple Silicon) は QEMU エミュレーションで `op` タイムアウトが起きやすい（本番は問題なし）
