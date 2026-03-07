@@ -15,5 +15,10 @@ RUN apt-get update \
     && rm /tmp/op.deb \
     && rm -rf /var/lib/apt/lists/*
 
+# Install GitHub CLI (gh)
+RUN apt-get update \
+    && apt-get install -y gh \
+    && rm -rf /var/lib/apt/lists/*
+
 # startup.sh fetches secrets from 1Password and launches the gateway
 ENTRYPOINT ["/startup.sh"]

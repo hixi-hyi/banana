@@ -95,9 +95,16 @@ git -C /home/node/.openclaw/workspace push
 
 - リモート: `https://github.com/hixi-hyi/banana`
 - user.name: `Banana (Railway)` / user.email: `banana-railway@openclaw`
-- **認証**: 起動時に `op read "op://banana/github/token"` で取得し `/root/.git-credentials` に設定済み
+- **認証**: 起動時に `op read "op://banana/github/password"` で取得し `/root/.git-credentials` に設定済み
   - push コマンド: `git -C /home/node/.openclaw/workspace push`
   - ⚠️ `git remote set-url` でトークンを埋め込むと TTY なし環境で失敗するので上記方法を使う
+
+## GitHub CLI (gh) 設定
+
+- **認証**: startup.sh で `gh auth login --with-token` により自動設定
+- token は 1Password: `op://banana/github/password` から取得
+- Docker 起動時に自動的に gh コマンドが使用可能に
+- **使い方**: `gh issue list`, `gh pr view <number>`, `gh issue create` など
 
 ## Environment Notes
 

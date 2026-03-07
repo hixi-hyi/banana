@@ -15,6 +15,10 @@ mkdir -p "${STATE_DIR}" "${WORKSPACE_DIR}" "${AGENT_DIR}"
 echo "[startup] fetching GITHUB_TOKEN from 1Password"
 GITHUB_TOKEN=$(op read "op://banana/github/password")
 
+# Setup gh CLI authentication
+echo "[startup] configuring gh CLI"
+echo "${GITHUB_TOKEN}" | gh auth login --with-token
+
 # ── 2. Clone or pull the banana repo ─────────────────────────────────────────
 REPO_URL="https://${GITHUB_TOKEN}@github.com/hixi-hyi/banana"
 if [ -d "${WORKSPACE_DIR}/.git" ]; then
