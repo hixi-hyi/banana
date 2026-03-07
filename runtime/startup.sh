@@ -35,13 +35,13 @@ echo "https://${GITHUB_TOKEN}@github.com" > /root/.git-credentials
 chmod 600 /root/.git-credentials
 echo "[startup] git credentials configured"
 
-# ── 3. Inject Anthropic API key into auth-profiles.json ──────────────────────
-echo "[startup] injecting auth-profiles.json"
-op inject --force -i "${WORKSPACE_DIR}/runtime/auth-profiles.json" -o "${AGENT_DIR}/auth-profiles.json"
+# ── 3. Copy auth-profiles.json（SecretRef で keyRef を使用）─────────────────
+echo "[startup] copying auth-profiles.json"
+cp "${WORKSPACE_DIR}/runtime/auth-profiles.json" "${AGENT_DIR}/auth-profiles.json"
 
-# ── 4. Inject all secrets into openclaw.json ─────────────────────────────────
-echo "[startup] injecting openclaw.json"
-op inject --force -i "${WORKSPACE_DIR}/openclaw.json" -o "${CONFIG}"
+# ── 4. Copy openclaw.json（SecretRef で op:// を使用、inject 不要）──────────
+echo "[startup] copying openclaw.json"
+cp "${WORKSPACE_DIR}/openclaw.json" "${CONFIG}"
 
 # ── 5. Launch gateway ─────────────────────────────────────────────────────────
 PORT="${PORT:-8080}"

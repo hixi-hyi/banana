@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// openclaw.json（volume上の実値）→ workspace/openclaw.json（テンプレート）に同期して git push する
+// openclaw.json（volume上）→ workspace/openclaw.json（git）に同期して push する
+// SecretRef 化後は live config と git config が同一形式なので単純コピーでよい
 // Usage: node /home/node/.openclaw/workspace/runtime/scripts/config-sync-container
 //        (コンテナ内から実行すること)
 'use strict';
@@ -12,34 +13,11 @@ const WORKSPACE_DIR = `${STATE_DIR}/workspace`;
 const SRC = `${STATE_DIR}/openclaw.json`;
 const DEST = `${WORKSPACE_DIR}/openclaw.json`;
 
-// 実値を 1Password テンプレート参照に戻すマッピング
-// キー: JSON パス（ドット区切り）、値: op:// テンプレート参照
-const OP_REFS = {
-  'channels.slack.botToken':  '{{ op://banana/slack-bot/password }}',
-  'channels.slack.appToken':  '{{ op://banana/slack-app/password }}',
-  'channels.discord.token':   '{{ op://banana/discord/password }}',
-  'gateway.auth.token':       '{{ op://banana/openclaw-gateway/password }}',
-};
-
-function restoreOpRefs(obj, path = '') {
-  if (obj === null || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map((v, i) => restoreOpRefs(v, `${path}.${i}`));
-  const result = {};
-  for (const [k, v] of Object.entries(obj)) {
-    const currentPath = path ? `${path}.${k}` : k;
-    result[k] = OP_REFS[currentPath] !== undefined
-      ? OP_REFS[currentPath]
-      : restoreOpRefs(v, currentPath);
-  }
-  return result;
-}
-
 console.log(`[config-sync] Reading ${SRC}`);
 const raw = JSON.parse(fs.readFileSync(SRC, 'utf8'));
-const template = restoreOpRefs(raw);
 
 console.log(`[config-sync] Writing ${DEST}`);
-fs.writeFileSync(DEST, JSON.stringify(template, null, 2) + '\n');
+fs.writeFileSync(DEST, JSON.stringify(raw, null, 2) + '\n');
 
 try {
   const diff = execSync(`git -C "${WORKSPACE_DIR}" diff openclaw.json`, { encoding: 'utf8' });

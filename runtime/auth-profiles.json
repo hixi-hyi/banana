@@ -4,7 +4,7 @@
     "anthropic:default": {
       "type": "api_key",
       "provider": "anthropic",
-      "key": "{{ op://banana/anthropic/password }}"
+      "keyRef": { "source": "exec", "provider": "op-anthropic", "id": "value" }
     }
   },
   "usageStats": {}

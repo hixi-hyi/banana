@@ -59,6 +59,45 @@
       }
     ]
   },
+  "secrets": {
+    "providers": {
+      "op-slack-bot": {
+        "source": "exec",
+        "command": "/usr/bin/op",
+        "args": ["read", "op://banana/slack-bot/password"],
+        "passEnv": ["OP_SERVICE_ACCOUNT_TOKEN", "HOME"],
+        "jsonOnly": false
+      },
+      "op-slack-app": {
+        "source": "exec",
+        "command": "/usr/bin/op",
+        "args": ["read", "op://banana/slack-app/password"],
+        "passEnv": ["OP_SERVICE_ACCOUNT_TOKEN", "HOME"],
+        "jsonOnly": false
+      },
+      "op-discord": {
+        "source": "exec",
+        "command": "/usr/bin/op",
+        "args": ["read", "op://banana/discord/password"],
+        "passEnv": ["OP_SERVICE_ACCOUNT_TOKEN", "HOME"],
+        "jsonOnly": false
+      },
+      "op-gateway": {
+        "source": "exec",
+        "command": "/usr/bin/op",
+        "args": ["read", "op://banana/openclaw-gateway/password"],
+        "passEnv": ["OP_SERVICE_ACCOUNT_TOKEN", "HOME"],
+        "jsonOnly": false
+      },
+      "op-anthropic": {
+        "source": "exec",
+        "command": "/usr/bin/op",
+        "args": ["read", "op://banana/anthropic/password"],
+        "passEnv": ["OP_SERVICE_ACCOUNT_TOKEN", "HOME"],
+        "jsonOnly": false
+      }
+    }
+  },
   "tools": {
     "web": {
       "search": {
@@ -83,8 +122,8 @@
       "mode": "socket",
       "webhookPath": "/slack/events",
       "enabled": true,
-      "botToken": "{{ op://banana/slack-bot/password }}",
-      "appToken": "{{ op://banana/slack-app/password }}",
+      "botToken": { "source": "exec", "provider": "op-slack-bot", "id": "value" },
+      "appToken": { "source": "exec", "provider": "op-slack-app", "id": "value" },
       "userTokenReadOnly": true,
       "groupPolicy": "open",
       "streaming": "partial",
@@ -106,7 +145,7 @@
     },
     "discord": {
       "enabled": true,
-      "token": "{{ op://banana/discord/password }}",
+      "token": { "source": "exec", "provider": "op-discord", "id": "value" },
       "groupPolicy": "allowlist",
       "guilds": {
         "1032098948552339527": {
@@ -130,7 +169,7 @@
     },
     "auth": {
       "mode": "token",
-      "token": "{{ op://banana/openclaw-gateway/password }}"
+      "token": { "source": "exec", "provider": "op-gateway", "id": "value" }
     },
     "tailscale": {
       "mode": "off",
