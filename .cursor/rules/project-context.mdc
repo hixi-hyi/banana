@@ -1,0 +1,79 @@
+---
+description: This rule is always applied. It explains the purpose and structure of this repository so the AI understands the project before making any changes.
+alwaysApply: true
+---
+
+# banana — openclaw 設定管理リポジトリ
+
+## openclaw とは
+
+[openclaw](https://github.com/openclaw/openclaw)（[docs](https://docs.openclaw.ai/)）は、セルフホスト型の AI エージェントゲートウェイ。
+WhatsApp / Telegram / Slack / Discord / iMessage など多数のチャットアプリを単一のゲートウェイで接続し、どこからでも AI アシスタントとやり取りできる OSS（MIT）。
+
+## このリポジトリは何か
+
+openclaw の設定ファイルと、エージェント「Banana」の人格・記憶・スケジューラーを管理するリポジトリ。
+Banana は Railway 上の Docker コンテナで稼働しており、Slack / Discord を通じてオーナー（hixi）と会話してタスクを実行する。
+
+---
+
+## アーキテクチャ概要
+
+```
+このリポジトリ (git)
+  ↓ Railway デプロイ時に clone/pull
+コンテナ内 /home/node/.openclaw/workspace/
+  ↓ startup.sh が op inject で secrets 展開
+/home/node/.openclaw/openclaw.json  ← 実際に openclaw が読む設定
+```
+
+- シークレット（API キー等）は `{{ op://banana/... }}` の形式で `openclaw.json` に書かれており、git に入っていても安全
+- 状態は Railway の Volume (`/home/node/.openclaw`) に永続化される
+
+---
+
+## ディレクトリ・ファイル構成
+
+### openclaw 設定ファイル（ルート直下）
+
+- **`openclaw.json`** — openclaw gateway の本体設定。エージェント・チャンネル・ツール・ゲートウェイ等。設定スキーマの詳細は [docs](https://docs.openclaw.ai/) 参照
+- **`cron-jobs.json`** — スケジュール実行ジョブの定義（朝レポート、コストレポート等）
+- **`railway.toml`** — Railway CLI 用のデプロイ設定
+
+### Banana の人格・記憶ファイル（ルート直下）
+
+openclaw はワークスペース内の特定ファイルを**エージェントのシステムプロンプトに自動注入**する（`AGENTS.md`, `SOUL.md`, `TOOLS.md`）。
+それ以外のファイルも Banana 自身が読み書きする。**Cursor での作業で勝手に変更しないこと。**
+
+- `AGENTS.md`, `SOUL.md`, `TOOLS.md` — openclaw が自動注入するエージェント指示・人格・ツール情報
+- `IDENTITY.md`, `MEMORY.md`, `USER.md`, `HEARTBEAT.md` — Banana が参照・更新する記憶・設定類
+- `memory/` — 日次記憶ファイル（Banana が書く）
+
+### `runtime/` — 実行環境
+
+コンテナ起動・デプロイに関するファイル群。Dockerfile、startup.sh、docker-compose.yml など。
+詳細な運用手順は `runtime/RAILWAY.md` に記載。
+
+### `scripts/` — Python スクリプト
+
+cron-jobs.json から呼び出される定期実行スクリプト群（Slack レポート、コストレポート等）。
+スクリプトは追加・変更されることがある。
+
+---
+
+## 重要な注意点
+
+1. **`op://` 参照は絶対に潰さない** — `{{ op://banana/... }}` 形式がシークレット管理の核心。実際のトークンを直書きしない
+2. **Banana の人格・記憶ファイルは勝手に変更しない** — 依頼された場合を除く
+3. **`openclaw.json` を変更したら commit & push → Railway が自動デプロイ**。コンテナ上で設定が変更された場合は `runtime/scripts/config-sync-container` でリポジトリに取り込む
+
+---
+
+## よく使う運用コマンド（詳細は `runtime/RAILWAY.md`）
+
+```bash
+./runtime/scripts/logs          # ログ確認
+./runtime/scripts/deploy        # デプロイ
+./runtime/scripts/ssh           # コンテナに SSH
+./runtime/scripts/config-get    # コンテナ上の openclaw.json 確認
+```
