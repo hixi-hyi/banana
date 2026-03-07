@@ -82,6 +82,13 @@
         "passEnv": ["OP_SERVICE_ACCOUNT_TOKEN", "HOME"],
         "jsonOnly": false
       },
+      "op-gateway": {
+        "source": "exec",
+        "command": "/usr/bin/op",
+        "args": ["read", "op://banana/openclaw-gateway/password"],
+        "passEnv": ["OP_SERVICE_ACCOUNT_TOKEN", "HOME"],
+        "jsonOnly": false
+      },
       "op-anthropic": {
         "source": "exec",
         "command": "/usr/bin/op",
@@ -161,7 +168,8 @@
       "allowInsecureAuth": true
     },
     "auth": {
-      "mode": "token"
+      "mode": "token",
+      "token": { "source": "exec", "provider": "op-gateway", "id": "value" }
     },
     "tailscale": {
       "mode": "off",
