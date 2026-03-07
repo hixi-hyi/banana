@@ -124,7 +124,7 @@
       "streaming": "progress",
       "nativeStreaming": true,
       "ackReaction": "",
-      "replyToMode": "first",
+      "replyToMode": "all",
       "thread": {
         "historyScope": "thread",
         "inheritParent": true
