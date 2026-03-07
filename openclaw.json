@@ -41,6 +41,7 @@
         "every": "30m",
         "target": "last"
       },
+      "typingMode": "instant",
       "maxConcurrent": 4,
       "subagents": {
         "maxConcurrent": 8
@@ -128,7 +129,6 @@
         "historyScope": "thread",
         "inheritParent": true
       },
-      "typingReaction": "banana",
       "chunkMode": "newline",
       "channels": {
         "C0AHBC2B3GB": {
