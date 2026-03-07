@@ -95,7 +95,8 @@
         },
         "C093DSHHRSN": {
           "allow": true,
-          "users": ["U02F8EGBTRQ"]
+          "users": ["U02F8EGBTRQ"],
+          "systemPrompt": "## 立替金トラッカー\n\nhixi の立替金（支払い代行）の記録を管理するスプレッドシート。\n\nスプレッドシート: https://docs.google.com/spreadsheets/d/1KVGjNshPbFWPXbDQTRwieQHNwEAFnjAqO-AxdPjan9w/edit\n\n### トリガー：メッセージに「立替」という単語が含まれていたら即実行\n\n確認不要。聞き返さずにそのまま実行すること。\n\nメッセージ例（すべてこのパターンで動く）:\n- `立替 今井湯 1000円`\n- `立替 食費 5000`\n- `立替 ACMの年会費 28434円`\n\n### 金額・用途の抽出ルール\n\n- 用途: 金額以外の名詞部分（「今井湯」「食費」「ACMの年会費」など）\n- 金額: 数字部分（円・¥は除去して整数に変換。「1000円」→ 1000）\n- 金額が万円表記の場合: 「1万円」→ 10000、「1.5万」→ 15000\n- 日付の指定がなければ今日のJSTを使う\n\n### 実行コマンド\n\n```\npython3 /home/node/.openclaw/workspace/scripts/loan-tracker.py --purpose \"用途\" --amount 金額（整数）\n```\n\n### 実行後\n\nスクリプトの出力をそのままユーザーに返す。エラーがあればエラー内容を伝える。"
         }
       },
       "allowBots": true,
