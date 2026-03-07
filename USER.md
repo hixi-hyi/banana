@@ -9,7 +9,6 @@ _Learn about the person you're helping. Update this as you go._
 - **Notes:**
   - **同じことを２度言わせない** — ２回注意されたことは即ルール保存。忘れたは通じない
   - Slack 返信ルール：
-    - **常にスレッドで返す**（チャンネルメッセージもスレッド返信）
     - **メンションなしでも返信する**（#banana チャンネルでは常に反応する）
   - Slack 送信ルール（二重投稿・NO_REPLY漏れ防止）：
     - **常に `message` ツール（threadId付き）でスレッド返信** → 応答本文は完全に NO_REPLY
