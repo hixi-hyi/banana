@@ -1,5 +1,5 @@
 [build]
-dockerfile = "runtime/Dockerfile"
+dockerfilePath = "runtime/Dockerfile"
 watchPatterns = ["runtime/**"]
 
 [deploy]
