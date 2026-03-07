@@ -62,21 +62,22 @@ banana/
 
 ## startup.sh の処理フロー（毎回起動時）
 
-1. `op read "op://banana/github/token"` → `GITHUB_TOKEN` を取得
+1. `op read "op://banana/github/password"` → `GITHUB_TOKEN` を取得
 2. リポジトリ全体を `/home/node/.openclaw/workspace/` に clone/pull
 3. git 認証情報を設定（`/root/.git-credentials`）
-4. `op read "op://banana/anthropic/credential"` → `auth-profiles.json` に書き込む
-5. `op inject -i workspace/openclaw.json -o openclaw.json` → シークレットを展開
+4. `workspace/runtime/auth-profiles.json` を agent dir にコピー
+5. `workspace/openclaw.json` を `/home/node/.openclaw/openclaw.json` にコピー
 6. `openclaw gateway run` で起動
 
-必要な Railway 環境変数は **`OP_SERVICE_ACCOUNT_TOKEN` のみ**。
+シークレットは openclaw の SecretRef 機能で起動時に 1Password から直接取得する（`op inject` 不要）。
+
+必要な Railway 環境変数は **`OP_SERVICE_ACCOUNT_TOKEN`** と **`OPENCLAW_GATEWAY_TOKEN`**。
 
 ## openclaw.json の管理
 
-`openclaw.json` はリポジトリに直接コミットされている。シークレット部分は `{{ op://... }}` 形式の
-テンプレート参照になっているため、git に入れても安全。
-
-起動時に `op inject` が参照を実値に展開して `/home/node/.openclaw/openclaw.json` に書き出す。
+`openclaw.json` はリポジトリに直接コミットされている。シークレット部分は openclaw の
+`SecretRef`（`{ "source": "exec", "provider": "op-*", "id": "value" }` 形式）で管理しており、
+git に入れても安全。openclaw が起動時に 1Password から直接取得する。
 
 ### 設定を変更したいとき
 
@@ -126,7 +127,7 @@ console.log('done');
 
 ### 設定をリセットしたい
 
-再デプロイすれば `startup.sh` が `openclaw.json`（git）を `op inject` で再展開する：
+再デプロイすれば `startup.sh` が最新の `openclaw.json`（git）をコピーして起動する：
 
 ```bash
 railway up --detach
@@ -138,3 +139,94 @@ railway up --detach
 # OP_SERVICE_ACCOUNT_TOKEN を .env に追加してから
 docker compose -f runtime/docker-compose.yml up
 ```
+
+---
+
+## ローカル検証方法
+
+openclaw の設定変更を Railway にデプロイする前にローカルで検証する手順。
+
+### 前提
+
+- Docker Desktop が起動していること
+- `OP_SERVICE_ACCOUNT_TOKEN` が手元にあること（1Password Service Account）
+- Mac (Apple Silicon) の場合は `--platform linux/amd64` が必要
+
+### 1. テスト用 Docker イメージのビルド
+
+```bash
+# フルイメージ（1Password CLI 含む）
+docker build --platform linux/amd64 -t openclaw-test -f runtime/Dockerfile .
+
+# ビルドに失敗する場合は --no-cache を付ける
+docker build --platform linux/amd64 --no-cache -t openclaw-test -f runtime/Dockerfile .
+```
+
+`op` のインストールパスを確認：
+
+```bash
+docker run --platform linux/amd64 --rm --entrypoint "" openclaw-test which op
+# → /usr/bin/op
+```
+
+### 2. config の schema バリデーション
+
+openclaw.json に構文・スキーマエラーがないか確認する。
+
+```bash
+docker run --platform linux/amd64 --rm \
+  --entrypoint "" \
+  -e HOME=/home/node \
+  -e OPENCLAW_STATE_DIR=/home/node/.openclaw \
+  -e OPENCLAW_GATEWAY_TOKEN=test-token \
+  -v $(pwd)/openclaw.json:/home/node/.openclaw/openclaw.json \
+  openclaw-test \
+  node /app/openclaw.mjs gateway run --port 18789 --bind loopback --auth token 2>&1 &
+PID=$!; sleep 5; kill $PID 2>/dev/null; wait $PID 2>/dev/null
+```
+
+エラーがなければ起動ログのみ表示される。スキーマエラーがある場合は即座に
+`Invalid config: <field>: <reason>` が出力される。
+
+### 3. SecretRef（1Password 連携）の確認
+
+`OP_SERVICE_ACCOUNT_TOKEN` を渡して、シークレットが正しく解決されるか確認する。
+
+```bash
+docker run --platform linux/amd64 --rm \
+  --entrypoint "" \
+  -e HOME=/home/node \
+  -e OPENCLAW_STATE_DIR=/home/node/.openclaw \
+  -e OPENCLAW_GATEWAY_TOKEN=test-token \
+  -e OP_SERVICE_ACCOUNT_TOKEN="<トークン>" \
+  -v $(pwd)/openclaw.json:/home/node/.openclaw/openclaw.json \
+  -v $(pwd)/runtime/auth-profiles.json:/home/node/.openclaw/agents/banana/agent/auth-profiles.json \
+  openclaw-test \
+  node /app/openclaw.mjs secrets audit --check 2>&1
+```
+
+正常時の出力例：
+```
+Secrets audit: ok. plaintext=0, unresolved=0, shadowed=0, legacy=0.
+```
+
+エラーがある場合は `[REF_UNRESOLVED]` や `[PLAINTEXT]` などが表示される。
+
+### 4. `op` が特定のシークレットを取得できるか確認
+
+```bash
+docker run --platform linux/amd64 --rm \
+  --entrypoint "" \
+  -e HOME=/home/node \
+  -e OP_SERVICE_ACCOUNT_TOKEN="<トークン>" \
+  openclaw-test \
+  op read "op://banana/anthropic/password" | cut -c1-10
+# → sk-ant-api（先頭10文字のみ表示）
+```
+
+### 注意事項
+
+- `secrets audit` は通るが `secrets audit --check` は exit code 2 で失敗することがある（タイムアウト起因）
+- `op` exec provider はデフォルト 5 秒タイムアウト。ローカルの Docker（QEMU エミュレーション）は遅いため Railway 本番より失敗しやすい
+- `auth-profiles.json` の `keyRef` は `secrets audit` の対象外（openclaw.json の SecretRef のみ評価される）
+- `gateway.auth.token` は JSON スキーマが `string` 型のみ（SecretRef オブジェクト不可）。Railway の `OPENCLAW_GATEWAY_TOKEN` 環境変数で代替
